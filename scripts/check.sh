@@ -1,80 +1,25 @@
 #!/bin/bash
 
-# Colors for output (only if terminal supports colors)
-# More robust color detection
-if [ -t 1 ] && [ "${TERM:-}" != "dumb" ] && [ "${TERM:-}" != "unknown" ]; then
-    # Check if colors are supported
-    if command -v tput >/dev/null 2>&1 && tput colors >/dev/null 2>&1 && [ "$(tput colors)" -ge 8 ]; then
-        RED='\033[0;31m'
-        GREEN='\033[0;32m'
-        YELLOW='\033[0;33m'
-        BLUE='\033[0;34m'
-        NC='\033[0m' # No Color
-        USE_COLORS=true
-    else
-        # Fallback: try to detect if we're in a modern terminal
-        case "${TERM:-}" in
-            xterm*|screen*|tmux*|linux*|vt100*)
-                RED='\033[0;31m'
-                GREEN='\033[0;32m'
-                YELLOW='\033[0;33m'
-                BLUE='\033[0;34m'
-                NC='\033[0m'
-                USE_COLORS=true
-                ;;
-            *)
-                RED=''
-                GREEN=''
-                YELLOW=''
-                BLUE=''
-                NC=''
-                USE_COLORS=false
-                ;;
-        esac
-    fi
-else
-    RED=''
-    GREEN=''
-    YELLOW=''
-    BLUE=''
-    NC=''
-    USE_COLORS=false
-fi
+# Simple text-based output without colors
 
 # Error handling
 set -euo pipefail
 
 # Logging functions
 log_info() {
-    if [ "$USE_COLORS" = true ]; then
-        printf "${BLUE}%s${NC}\n" "$1"
-    else
-        printf "[INFO] %s\n" "$1"
-    fi
+    printf "[INFO] %s\n" "$1"
 }
 
 log_success() {
-    if [ "$USE_COLORS" = true ]; then
-        printf "${GREEN}%s${NC}\n" "$1"
-    else
-        printf "[SUCCESS] %s\n" "$1"
-    fi
+    printf "[SUCCESS] %s\n" "$1"
 }
 
 log_warning() {
-    if [ "$USE_COLORS" = true ]; then
-        printf "${YELLOW}%s${NC}\n" "$1"
-    else
-        printf "[WARNING] %s\n" "$1"
-    fi
+    printf "[WARNING] %s\n" "$1"
 }
 
 log_error() {
-    if [ "$USE_COLORS" = true ]; then
-        printf "${RED}%s${NC}\n" "$1" >&2
-    else
-        printf "[ERROR] %s\n" "$1" >&2
-    fi
+    printf "[ERROR] %s\n" "$1" >&2
 }
 
 # Function to check if a file exists
@@ -197,7 +142,7 @@ main() {
                 fi
                 ;;
         esac
-    done < <(find "$module_path" -name "*.php" ! -name "index.php" ! -name "*cs-fixer*" \( -path "*/vendor" -o -path "*/node_modules" -o -path "*/.github" -o -path "*/.git" -o -path "*/translations" -o -path "*/tests" \) -prune -o -type f -print0)
+    done < <(find "$module_path" \( -path "*/vendor" -o -path "*/node_modules" -o -path "*/.github" -o -path "*/.git" -o -path "*/translations" -o -path "*/tests" \) -prune -o -name "*.php" ! -name "index.php" ! -name "*cs-fixer*" -type f -print0)
 
     # 5. Check .htaccess in log directories
     for log_dir in "$module_path/log" "$module_path/logs"; do
