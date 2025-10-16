@@ -131,52 +131,6 @@ install_scripts() {
     log_info "  ps:module-index    # Create index.php files in subdirectories"
 }
 
-# Check if running from GitHub (direct execution)
-if [ "${1:-}" = "--github" ]; then
-    # This is being run directly from GitHub
-    install_scripts
-else
-    # This is being run locally
-    log_info "Local installation mode"
-    log_info "Copying local scripts to $ARKONSOFT_DIR"
-    
-    # Create directory structure
-    mkdir -p "$SCRIPTS_DIR"
-    
-    # Copy local scripts
-    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)/scripts"
-    for script in check.sh create.sh index.sh license.sh loader.sh; do
-        if [ -f "$SCRIPT_DIR/$script" ]; then
-            cp "$SCRIPT_DIR/$script" "$SCRIPTS_DIR/$script"
-            chmod +x "$SCRIPTS_DIR/$script"
-            log_success "Copied and made executable: $script"
-        else
-            log_error "Local script not found: $SCRIPT_DIR/$script"
-            exit 1
-        fi
-    done
-    
-    # Detect and configure shell profile
-    profile_file=$(detect_profile)
-    log_info "Detected profile file: $profile_file"
-    
-    if profile_contains_config "$profile_file"; then
-        log_warning "Configuration already exists in $profile_file"
-    else
-        log_info "Adding configuration to $profile_file"
-        add_to_profile "$profile_file"
-        log_success "Configuration added to $profile_file"
-    fi
-    
-    log_success "Local installation completed successfully!"
-    log_info ""
-    log_info "To start using the scripts, either:"
-    log_info "1. Restart your terminal, or"
-    log_info "2. Run: source $profile_file"
-    log_info ""
-    log_info "Available commands after installation:"
-    log_info "  ps:module-check    # Check PrestaShop module installation"
-    log_info "  ps:module-create   # Create new PrestaShop module"
-    log_info "  ps:module-license  # Check licenses in files"
-    log_info "  ps:module-index    # Create index.php files in subdirectories"
-fi
+# Always use GitHub installation mode for consistency
+# This ensures the same behavior regardless of current directory or installation method
+install_scripts
