@@ -1,16 +1,24 @@
-#!/bin/sh
+#!/bin/bash
 
 # PrestaShop Scripts Installer
 # This script downloads and installs PrestaShop development scripts
 
-set -e
+set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Colors for output (only if terminal supports colors)
+if [ -t 1 ] && [ "${TERM:-}" != "dumb" ] && command -v tput >/dev/null 2>&1 && tput colors >/dev/null 2>&1; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m' # No Color
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    BLUE=''
+    NC=''
+fi
 
 # Logging functions
 log_info() {
@@ -36,9 +44,9 @@ REPO_URL="https://raw.githubusercontent.com/Arkonsoft/ps-scripts/main"
 
 # Function to detect shell profile file
 detect_profile() {
-    if [ -n "$ZSH_VERSION" ]; then
+    if [ -n "${ZSH_VERSION:-}" ]; then
         echo "$HOME/.zshrc"
-    elif [ -n "$BASH_VERSION" ]; then
+    elif [ -n "${BASH_VERSION:-}" ]; then
         if [ -f "$HOME/.bashrc" ]; then
             echo "$HOME/.bashrc"
         elif [ -f "$HOME/.bash_profile" ]; then
@@ -55,7 +63,7 @@ detect_profile() {
 profile_contains_config() {
     local profile_file="$1"
     if [ -f "$profile_file" ]; then
-        grep -q "ARKONSOFT_DIR" "$profile_file" 2>/dev/null
+        grep -q "ARKONSOFT_DIR" "$profile_file" 2>/dev/null || return 1
     else
         return 1
     fi
@@ -124,7 +132,7 @@ install_scripts() {
 }
 
 # Check if running from GitHub (direct execution)
-if [ -n "$1" ] && [ "$1" = "--github" ]; then
+if [ "${1:-}" = "--github" ]; then
     # This is being run directly from GitHub
     install_scripts
 else

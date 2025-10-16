@@ -1,11 +1,19 @@
-#!/bin/sh
+#!/bin/bash
 
-# Constants
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Colors for output (only if terminal supports colors)
+if [ -t 1 ] && [ "${TERM:-}" != "dumb" ] && command -v tput >/dev/null 2>&1 && tput colors >/dev/null 2>&1; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m' # No Color
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    BLUE=''
+    NC=''
+fi
 
 # Logging functions
 log_info() {
@@ -42,7 +50,7 @@ log_info "Starting to copy index.php to all subdirectories..."
 log_warning "Source index.php: $(pwd)/index.php"
 
 # Find all directories recursively, excluding node_modules and vendor
-find . -type d -not -path "*/\.*" -not -path "*/node_modules/*" -not -path "*/vendor/*" | while read dir; do
+while IFS= read -r -d '' dir; do
     # Skip current directory
     if [ "$dir" = "." ]; then
         continue
@@ -63,7 +71,7 @@ find . -type d -not -path "*/\.*" -not -path "*/node_modules/*" -not -path "*/ve
             fi
         fi
     fi
-done
+done < <(find . -type d -not -path "*/\.*" -not -path "*/node_modules/*" -not -path "*/vendor/*" -print0)
 
 log_info "Process completed"
 log_success "Created $CREATED_COUNT index.php files"

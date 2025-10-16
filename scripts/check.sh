@@ -1,14 +1,22 @@
-#!/bin/sh
+#!/bin/bash
 
-# Constants
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Colors for output (only if terminal supports colors)
+if [ -t 1 ] && [ "${TERM:-}" != "dumb" ] && command -v tput >/dev/null 2>&1 && tput colors >/dev/null 2>&1; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m' # No Color
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    BLUE=''
+    NC=''
+fi
 
 # Error handling
-set -e
+set -euo pipefail
 
 # Logging functions
 log_info() {
@@ -93,13 +101,13 @@ main() {
     log_info "Starting module checks for: $module_name ($module_path)"
 
     # 1. Check for index.php in all directories (except excluded directories)
-    excluded_dirs="vendor node_modules .github .git"
-    for dir in $(find "$module_path" -type d $(printf " -not -path '$module_path/%s' -not -path '$module_path/%s/*'" $excluded_dirs $excluded_dirs)); do
+    excluded_dirs=("vendor" "node_modules" ".github" ".git")
+    while IFS= read -r -d '' dir; do
         if [ ! -f "$dir/index.php" ]; then
             log_error "Missing required file: $dir/index.php"
             error_count=$((error_count + 1))
         fi
-    done
+    done < <(find "$module_path" -type d \( -name "vendor" -o -name "node_modules" -o -name ".github" -o -name ".git" \) -prune -o -type d -print0)
 
     # 2. Check .htaccess in main module directory
     if [ ! -f "$module_path/.htaccess" ]; then
@@ -114,8 +122,7 @@ main() {
     fi
 
     # 4. Check PHP files for version check and license (excluding excluded directories and files)
-    excluded_dirs="vendor node_modules .github .git translations tests"
-    for php_file in $(find "$module_path" -name "*.php" ! -name "index.php" ! -name "*cs-fixer*" $(printf " ! -path '$module_path/%s' ! -path '$module_path/%s/*'" $excluded_dirs $excluded_dirs)); do
+    while IFS= read -r -d '' php_file; do
         if ! grep -q "!defined('_PS_VERSION_')" "$php_file"; then
             log_error "Missing PrestaShop version check in: $php_file"
             error_count=$((error_count + 1))
@@ -148,7 +155,7 @@ main() {
                 fi
                 ;;
         esac
-    done
+    done < <(find "$module_path" -name "*.php" ! -name "index.php" ! -name "*cs-fixer*" \( -path "*/vendor" -o -path "*/node_modules" -o -path "*/.github" -o -path "*/.git" -o -path "*/translations" -o -path "*/tests" \) -prune -o -type f -print0)
 
     # 5. Check .htaccess in log directories
     for log_dir in "$module_path/log" "$module_path/logs"; do

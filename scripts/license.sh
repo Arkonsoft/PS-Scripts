@@ -1,14 +1,22 @@
-#!/bin/sh
+#!/bin/bash
 
-# Constants
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Colors for output (only if terminal supports colors)
+if [ -t 1 ] && [ "${TERM:-}" != "dumb" ] && command -v tput >/dev/null 2>&1 && tput colors >/dev/null 2>&1; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m' # No Color
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    BLUE=''
+    NC=''
+fi
 
 # Error handling
-set -e
+set -euo pipefail
 
 # Logging functions
 log_info() {
@@ -42,7 +50,7 @@ FILES_WITHOUT_LICENSE=0
 log_info "Checking PHP files for license headers in all subdirectories..."
 
 # Find all PHP files recursively, excluding node_modules and vendor
-find . -name "*.php" -type f -not -path "*/\.*" -not -path "*/node_modules/*" -not -path "*/vendor/*" -not -path "*/translations/*" -not -path "*/tests/*" | while read file; do
+while IFS= read -r -d '' file; do
     TOTAL_FILES=$((TOTAL_FILES + 1))
     
     # Check if file contains license notice
@@ -53,7 +61,7 @@ find . -name "*.php" -type f -not -path "*/\.*" -not -path "*/node_modules/*" -n
         log_error "✗ Missing license: $file"
         FILES_WITHOUT_LICENSE=$((FILES_WITHOUT_LICENSE + 1))
     fi
-done
+done < <(find . -name "*.php" -type f -not -path "*/\.*" -not -path "*/node_modules/*" -not -path "*/vendor/*" -not -path "*/translations/*" -not -path "*/tests/*" -print0)
 
 # Print summary
 log_info "License check completed"

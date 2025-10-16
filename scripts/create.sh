@@ -1,18 +1,26 @@
-#!/bin/sh
+#!/bin/bash
 
-# Constants
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Colors for output (only if terminal supports colors)
+if [ -t 1 ] && [ "${TERM:-}" != "dumb" ] && command -v tput >/dev/null 2>&1 && tput colors >/dev/null 2>&1; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m' # No Color
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    BLUE=''
+    NC=''
+fi
 
 EXAMPLE_LOWER="arkonexample"
 EXAMPLE_PASCAL="ArkonExample"
 GITHUB_REPO="https://github.com/Arkonsoft/PS-Example-Module-8.git"
 
 # Error handling
-set -e
+set -euo pipefail
 
 # Logging functions
 log_info() {
@@ -33,13 +41,11 @@ log_error() {
 
 # Utility functions
 to_lower() {
-    echo "$1" | tr '[:upper:]' '[:lower:]'
+    echo "${1,,}"
 }
 
 to_pascal() {
-    first_char=$(echo "$1" | cut -c1 | tr '[:lower:]' '[:upper:]')
-    rest_chars=$(echo "$1" | cut -c2-)
-    echo "${first_char}${rest_chars}"
+    echo "${1^}"
 }
 
 # Validation functions
@@ -51,7 +57,7 @@ validate_input() {
     fi
 
     # Check if module name contains only valid characters
-    if ! echo "$1" | grep -q '^[a-zA-Z][a-zA-Z0-9]*$'; then
+    if [[ ! "$1" =~ ^[a-zA-Z][a-zA-Z0-9]*$ ]]; then
         log_error "Error: Module name must start with a letter and contain only letters and numbers"
         exit 1
     fi
@@ -108,10 +114,10 @@ initialize_module_repository() {
 
 # File operations
 replace_text_in_files() {
-    search_text=$1
-    replace_text=$2
+    local search_text="$1"
+    local replace_text="$2"
     
-    find . -type f -not -path "*/\.*" -not -path "*/vendor/*" | while read file; do
+    while IFS= read -r -d '' file; do
         if [ -s "$file" ]; then
             log_warning "Processing file: $(basename "$file")"
             
@@ -122,13 +128,13 @@ replace_text_in_files() {
                 echo "  No changes needed"
             fi
         fi
-    done
+    done < <(find . -type f -not -path "*/\.*" -not -path "*/vendor/*" -print0)
 }
 
 rename_module_files() {
     log_info "Renaming files..."
     
-    find . -type f -not -path "*/\.*" -not -path "*/vendor/*" | while read file; do
+    while IFS= read -r -d '' file; do
         filename=$(basename "$file")
         directory=$(dirname "$file")
         newname="$filename"
@@ -146,7 +152,7 @@ rename_module_files() {
             log_warning "Renaming: $filename -> $newname"
             mv "$file" "$directory/$newname"
         fi
-    done
+    done < <(find . -type f -not -path "*/\.*" -not -path "*/vendor/*" -print0)
 }
 
 install_module_dependencies() {

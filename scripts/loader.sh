@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # PrestaShop Scripts Loader
 # This file creates wrapper scripts for all PrestaShop scripts
@@ -24,7 +24,7 @@ create_wrapper() {
     # Only create if it doesn't exist or is older than the source script
     if [ ! -f "$wrapper_path" ] || [ "$SCRIPTS_DIR/$target_script" -nt "$wrapper_path" ]; then
         cat > "$wrapper_path" << EOF
-#!/bin/sh
+#!/bin/bash
 if [ -f "$SCRIPTS_DIR/$target_script" ]; then
     "$SCRIPTS_DIR/$target_script" "\$@"
 else
@@ -43,7 +43,7 @@ create_wrapper "ps:module-license" "license.sh"
 create_wrapper "ps:module-index" "index.sh"
 
 # Add bin directory to PATH if not already present
-if [ -d "$BIN_DIR" ] && ! echo "$PATH" | grep -q "$BIN_DIR"; then
+if [ -d "$BIN_DIR" ] && [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
     export PATH="$BIN_DIR:$PATH"
 fi
 
