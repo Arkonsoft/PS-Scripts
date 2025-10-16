@@ -1,0 +1,179 @@
+#!/bin/sh
+
+# Constants
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Error handling
+set -e
+
+# Logging functions
+log_info() {
+    echo "${BLUE}$1${NC}"
+}
+
+log_success() {
+    echo "${GREEN}$1${NC}"
+}
+
+log_warning() {
+    echo "${YELLOW}$1${NC}"
+}
+
+log_error() {
+    echo "${RED}$1${NC}" >&2
+}
+
+# Function to check if a file exists
+check_file_exists() {
+    if [ ! -f "$1" ]; then
+        if echo "$1" | grep -q "index.php"; then
+            log_error "Missing required file: $1"
+        elif echo "$1" | grep -q ".htaccess"; then
+            log_error "Missing required file: $1"
+        else
+            log_error "Missing required file: $1"
+        fi
+    fi
+}
+
+# Function to check PHP file header
+check_php_header() {
+    if ! grep -q "!defined('_PS_VERSION_')" "$1"; then
+        log_error "Missing PrestaShop version check in: $1"
+    fi
+}
+
+# Function to check PHP license header
+check_php_license() {
+    if ! grep -q "NOTICE OF LICENSE" "$1"; then
+        log_error "Missing license notice in: $1"
+    fi
+}
+
+# Function to check composer.json
+check_composer_json() {
+    if [ -f "$1" ]; then
+        if ! grep -q '"prepend-autoloader": false' "$1"; then
+            log_error "Missing or incorrect 'prepend-autoloader' setting in: $1 (should be set to false)"
+        fi
+    fi
+}
+
+# Function to check if uninstall method uses unregisterHook (should NOT be present)
+check_uninstall_unregister_hook() {
+    local file="$1"
+    if grep -q 'function uninstall' "$file"; then
+        if grep -Eq 'unregisterHook\s*\(' "$file"; then
+            log_error "unregisterHook should NOT be used in uninstall method of: $file"
+        fi
+    fi
+}
+
+# Function to check for translation functions in constructor for blgn modules (should NOT be present)
+check_blgn_constructor_translations() {
+    local file="$1"
+    if grep -q 'function __construct' "$file"; then
+        constructor_lines=$(awk '/function __construct/{flag=1} /function [^_]|^}/ {if(flag){flag=0}} flag' "$file")
+        if echo "$constructor_lines" | grep -E '\$this->l\(|this->getTranslator\(|\$this->trans\('; then
+            log_error "Translation function should NOT be used in constructor in: $file"
+        fi
+    fi
+}
+
+# Main execution
+main() {
+    module_path="."
+    module_name=$(basename "$PWD")
+    error_count=0
+    
+    log_info "Starting module checks for: $module_name ($module_path)"
+
+    # 1. Check for index.php in all directories (except vendor/node_modules)
+    for dir in $(find "$module_path" -type d -not -path "$module_path/vendor" -not -path "$module_path/vendor/*" -not -path "$module_path/node_modules" -not -path "$module_path/node_modules/*"); do
+        if [ ! -f "$dir/index.php" ]; then
+            log_error "Missing required file: $dir/index.php"
+            error_count=$((error_count + 1))
+        fi
+    done
+
+    # 2. Check .htaccess in main module directory
+    if [ ! -f "$module_path/.htaccess" ]; then
+        log_error "Missing required file: $module_path/.htaccess"
+        error_count=$((error_count + 1))
+    fi
+
+    # 3. Check for logo.png
+    if [ ! -f "$module_path/logo.png" ]; then
+        log_error "Missing required file: $module_path/logo.png"
+        error_count=$((error_count + 1))
+    fi
+
+    # 4. Check PHP files for version check and license (excluding translations, vendor, node_modules, tests and cs-fixer files)
+    for php_file in $(find "$module_path" -name "*.php" ! -name "index.php" ! -path "$module_path/translations" ! -path "$module_path/translations/*" ! -path "$module_path/vendor" ! -path "$module_path/vendor/*" ! -path "$module_path/node_modules" ! -path "$module_path/node_modules/*" ! -path "$module_path/tests" ! -path "$module_path/tests/*" ! -name "*cs-fixer*"); do
+        if ! grep -q "!defined('_PS_VERSION_')" "$php_file"; then
+            log_error "Missing PrestaShop version check in: $php_file"
+            error_count=$((error_count + 1))
+        fi
+        
+        if ! grep -q "NOTICE OF LICENSE" "$php_file"; then
+            log_error "Missing license notice in: $php_file"
+            error_count=$((error_count + 1))
+        fi
+        
+        # Check for unregisterHook in uninstall method in main module file
+        case "$php_file" in
+            "$module_path/"*.php)
+                if grep -q 'function uninstall' "$php_file"; then
+                    if grep -Eq 'unregisterHook\s*\(' "$php_file"; then
+                        log_error "unregisterHook should NOT be used in uninstall method of: $php_file"
+                        error_count=$((error_count + 1))
+                    fi
+                fi
+                
+                # If module starts with blgn, check for translation functions in constructor
+                if echo "$module_name" | grep -q '^blgn'; then
+                    if grep -q 'function __construct' "$php_file"; then
+                        constructor_lines=$(awk '/function __construct/{flag=1} /function [^_]|^}/ {if(flag){flag=0}} flag' "$php_file")
+                        if echo "$constructor_lines" | grep -E '\$this->l\(|this->getTranslator\(|\$this->trans\('; then
+                            log_error "Translation function should NOT be used in constructor in: $php_file"
+                            error_count=$((error_count + 1))
+                        fi
+                    fi
+                fi
+                ;;
+        esac
+    done
+
+    # 5. Check .htaccess in log directories
+    for log_dir in "$module_path/log" "$module_path/logs"; do
+        if [ -d "$log_dir" ]; then
+            if [ ! -f "$log_dir/.htaccess" ]; then
+                log_error "Missing required file: $log_dir/.htaccess"
+                error_count=$((error_count + 1))
+            fi
+        fi
+    done
+
+    # 6. Check composer.json
+    if [ -f "$module_path/composer.json" ]; then
+        if ! grep -q '"prepend-autoloader": false' "$module_path/composer.json"; then
+            log_error "Missing or incorrect 'prepend-autoloader' setting in: $module_path/composer.json (should be set to false)"
+            error_count=$((error_count + 1))
+        fi
+    fi
+
+    # Display summary
+    if [ $error_count -gt 0 ]; then
+        log_error "Found $error_count errors."
+        exit 1
+    else
+        log_success "All checks passed successfully!"
+        exit 0
+    fi
+}
+
+main "$@"
