@@ -1,18 +1,44 @@
 #!/bin/bash
 
 # Colors for output (only if terminal supports colors)
-if [ -t 1 ] && [ "${TERM:-}" != "dumb" ] && command -v tput >/dev/null 2>&1 && tput colors >/dev/null 2>&1; then
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[0;33m'
-    BLUE='\033[0;34m'
-    NC='\033[0m' # No Color
+# More robust color detection
+if [ -t 1 ] && [ "${TERM:-}" != "dumb" ] && [ "${TERM:-}" != "unknown" ]; then
+    # Check if colors are supported
+    if command -v tput >/dev/null 2>&1 && tput colors >/dev/null 2>&1 && [ "$(tput colors)" -ge 8 ]; then
+        RED='\033[0;31m'
+        GREEN='\033[0;32m'
+        YELLOW='\033[0;33m'
+        BLUE='\033[0;34m'
+        NC='\033[0m' # No Color
+        USE_COLORS=true
+    else
+        # Fallback: try to detect if we're in a modern terminal
+        case "${TERM:-}" in
+            xterm*|screen*|tmux*|linux*|vt100*)
+                RED='\033[0;31m'
+                GREEN='\033[0;32m'
+                YELLOW='\033[0;33m'
+                BLUE='\033[0;34m'
+                NC='\033[0m'
+                USE_COLORS=true
+                ;;
+            *)
+                RED=''
+                GREEN=''
+                YELLOW=''
+                BLUE=''
+                NC=''
+                USE_COLORS=false
+                ;;
+        esac
+    fi
 else
     RED=''
     GREEN=''
     YELLOW=''
     BLUE=''
     NC=''
+    USE_COLORS=false
 fi
 
 # Error handling
@@ -20,19 +46,35 @@ set -euo pipefail
 
 # Logging functions
 log_info() {
-    echo "${BLUE}$1${NC}"
+    if [ "$USE_COLORS" = true ]; then
+        printf "${BLUE}%s${NC}\n" "$1"
+    else
+        printf "[INFO] %s\n" "$1"
+    fi
 }
 
 log_success() {
-    echo "${GREEN}$1${NC}"
+    if [ "$USE_COLORS" = true ]; then
+        printf "${GREEN}%s${NC}\n" "$1"
+    else
+        printf "[SUCCESS] %s\n" "$1"
+    fi
 }
 
 log_warning() {
-    echo "${YELLOW}$1${NC}"
+    if [ "$USE_COLORS" = true ]; then
+        printf "${YELLOW}%s${NC}\n" "$1"
+    else
+        printf "[WARNING] %s\n" "$1"
+    fi
 }
 
 log_error() {
-    echo "${RED}$1${NC}" >&2
+    if [ "$USE_COLORS" = true ]; then
+        printf "${RED}%s${NC}\n" "$1" >&2
+    else
+        printf "[ERROR] %s\n" "$1" >&2
+    fi
 }
 
 # Function to check if a file exists
