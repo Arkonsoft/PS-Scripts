@@ -92,8 +92,9 @@ main() {
     
     log_info "Starting module checks for: $module_name ($module_path)"
 
-    # 1. Check for index.php in all directories (except vendor/node_modules)
-    for dir in $(find "$module_path" -type d -not -path "$module_path/vendor" -not -path "$module_path/vendor/*" -not -path "$module_path/node_modules" -not -path "$module_path/node_modules/*"); do
+    # 1. Check for index.php in all directories (except excluded directories)
+    excluded_dirs="vendor node_modules .github .git"
+    for dir in $(find "$module_path" -type d $(printf " -not -path '$module_path/%s' -not -path '$module_path/%s/*'" $excluded_dirs $excluded_dirs)); do
         if [ ! -f "$dir/index.php" ]; then
             log_error "Missing required file: $dir/index.php"
             error_count=$((error_count + 1))
@@ -112,8 +113,9 @@ main() {
         error_count=$((error_count + 1))
     fi
 
-    # 4. Check PHP files for version check and license (excluding translations, vendor, node_modules, tests and cs-fixer files)
-    for php_file in $(find "$module_path" -name "*.php" ! -name "index.php" ! -path "$module_path/translations" ! -path "$module_path/translations/*" ! -path "$module_path/vendor" ! -path "$module_path/vendor/*" ! -path "$module_path/node_modules" ! -path "$module_path/node_modules/*" ! -path "$module_path/tests" ! -path "$module_path/tests/*" ! -name "*cs-fixer*"); do
+    # 4. Check PHP files for version check and license (excluding excluded directories and files)
+    excluded_dirs="vendor node_modules .github .git translations tests"
+    for php_file in $(find "$module_path" -name "*.php" ! -name "index.php" ! -name "*cs-fixer*" $(printf " ! -path '$module_path/%s' ! -path '$module_path/%s/*'" $excluded_dirs $excluded_dirs)); do
         if ! grep -q "!defined('_PS_VERSION_')" "$php_file"; then
             log_error "Missing PrestaShop version check in: $php_file"
             error_count=$((error_count + 1))
