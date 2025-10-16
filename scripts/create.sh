@@ -179,13 +179,21 @@ confirm_module_location() {
     fi
 }
 
-delete_readme() {
-    log_info "Deleting README.md..."
+delete_readme_and_github() {
+    log_info "Deleting README.md and .github directory..."
+    
     if [ -f "README.md" ]; then
         rm "README.md"
         log_success "README.md deleted successfully"
     else
         log_warning "README.md not found"
+    fi
+    
+    if [ -d ".github" ]; then
+        rm -rf ".github"
+        log_success ".github directory deleted successfully"
+    else
+        log_warning ".github directory not found"
     fi
 }
 
@@ -210,7 +218,7 @@ main() {
 
     # Rename files and install dependencies
     rename_module_files
-    delete_readme
+    delete_readme_and_github
     install_module_dependencies
 
     # Return to original location
