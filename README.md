@@ -22,30 +22,9 @@ wget -qO- https://raw.githubusercontent.com/Arkonsoft/ps-scripts/main/install.sh
 - Shell: bash, zsh, lub sh
 - cURL lub wget (do instalacji)
 
-## 🔧 Instalacja
+## 🔧 Po instalacji
 
-Skrypt instalacyjny automatycznie:
-
-1. **Pobiera skrypty** z repozytorium do `~/.arkonsoft/scripts/`
-2. **Tworzy wrapper scripts** w `~/.arkonsoft/bin/` z nazwami komend
-3. **Konfiguruje profil shell** - dodaje konfigurację do odpowiedniego pliku profilu:
-   - `~/.bashrc` (bash)
-   - `~/.bash_profile` (bash)
-   - `~/.zshrc` (zsh)
-   - `~/.profile` (sh/fallback)
-
-### Konfiguracja dodawana do profilu:
-
-```bash
-# PrestaShop Scripts Configuration
-export ARKONSOFT_DIR="$HOME/.arkonsoft"
-[ -s "$ARKONSOFT_DIR/scripts/loader.sh" ] && \. "$ARKONSOFT_DIR/scripts/loader.sh" # To ładuje skrypty PrestaShop
-export PATH="$ARKONSOFT_DIR/bin:$PATH" # Add PrestaShop scripts to PATH
-```
-
-### Po instalacji:
-
-1. **Restart terminala** lub uruchom: `source ~/.profile` (lub odpowiedni plik profilu)
+1. **Restart terminala** lub uruchom: `source ~/.profile`
 2. **Sprawdź instalację**: `ps:module-check`
 ## 📦 Dostępne komendy
 
@@ -71,6 +50,17 @@ Tworzy nowy moduł PrestaShop z kompletną strukturą katalogów i plików.
 
 ```bash
 ps:module-create <nazwa-modułu>
+```
+
+### `ps:docker-create`
+Konfiguruje środowisko Docker dla projektu PrestaShop.
+- Klonuje repozytorium PS-Docker z konfiguracją Docker
+- Kopiuje pliki konfiguracyjne do bieżącego katalogu
+- Aktualizuje plik `.gitignore` o odpowiednie wpisy
+- Instruuje użytkownika o dalszych krokach konfiguracji
+
+```bash
+ps:docker-create
 ```
 
 ### `ps:module-license`
@@ -104,6 +94,9 @@ ps:module-check
 # Utwórz nowy moduł
 ps:module-create ArkonExample
 
+# Skonfiguruj środowisko Docker
+ps:docker-create
+
 # Sprawdź licencje
 ps:module-license
 
@@ -111,44 +104,10 @@ ps:module-license
 ps:module-index
 ```
 
-## 📁 Struktura instalacji
-
-Po instalacji skrypty są umieszczone w:
-
-```
-~/.arkonsoft/
-├── scripts/           # Oryginalne skrypty
-│   ├── check.sh
-│   ├── create.sh
-│   ├── index.sh
-│   ├── license.sh
-│   └── loader.sh
-└── bin/               # Wrapper scripts (komendy)
-    ├── ps:module-check
-    ├── ps:module-create
-    ├── ps:module-license
-    └── ps:module-index
-```
-
 ## 🔄 Aktualizacja
 
-Aby zaktualizować skrypty, po prostu uruchom ponownie skrypt instalacyjny:
+Aby zaktualizować skrypty, uruchom ponownie skrypt instalacyjny:
 
 ```bash
 curl -o- https://raw.githubusercontent.com/Arkonsoft/ps-scripts/main/install.sh | bash
 ```
-
-## 🗑️ Odinstalowanie
-
-Aby odinstalować skrypty:
-
-1. Usuń katalog: `rm -rf ~/.arkonsoft`
-2. Usuń konfigurację z pliku profilu (usuń linie z "PrestaShop Scripts Configuration")
-3. Restart terminala
-
-## 🤝 Wsparcie
-
-W przypadku problemów lub pytań:
-- Sprawdź logi instalacji
-- Upewnij się, że masz odpowiednie uprawnienia
-- Zastanów się, czy PrestaShop to bezpieczna technologia dla Twojego zdrowia
