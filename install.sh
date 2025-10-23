@@ -82,7 +82,7 @@ install_scripts() {
     
     # Download scripts
     log_info "Downloading scripts from repository..."
-    for script in check.sh create.sh index.sh license.sh loader.sh; do
+    for script in check.sh create.sh docker-create.sh index.sh license.sh loader.sh; do
         log_info "Downloading $script..."
         if curl -s -f -o "$SCRIPTS_DIR/$script" "$REPO_URL/scripts/$script"; then
             chmod +x "$SCRIPTS_DIR/$script"
@@ -114,6 +114,7 @@ install_scripts() {
     log_info "Available commands after installation:"
     log_info "  ps:module-check    # Check PrestaShop module installation"
     log_info "  ps:module-create   # Create new PrestaShop module"
+    log_info "  ps:docker-create   # Setup Docker configuration for PrestaShop"
     log_info "  ps:module-license  # Check licenses in files"
     log_info "  ps:module-index    # Create index.php files in subdirectories"
 }

@@ -39,6 +39,7 @@ EOF
 # Create wrapper scripts for each command
 create_wrapper "ps:module-check" "check.sh"
 create_wrapper "ps:module-create" "create.sh"
+create_wrapper "ps:docker-create" "docker-create.sh"
 create_wrapper "ps:module-license" "license.sh"
 create_wrapper "ps:module-index" "index.sh"
 
