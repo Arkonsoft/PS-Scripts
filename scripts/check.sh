@@ -94,7 +94,7 @@ main() {
             log_error "Missing required file: $dir/index.php"
             error_count=$((error_count + 1))
         fi
-    done < <(find "$module_path" -type d \( -name "vendor" -o -name "node_modules" -o -name ".github" -o -name ".git" \) -prune -o -type d -print0)
+    done < <(find "$module_path" -type d \( -name "vendor" -o -name "node_modules" -o -name ".github" -o -name ".git" -o -name ".webpack" \) -prune -o -type d -print0)
 
     # 2. Check .htaccess in main module directory
     if [ ! -f "$module_path/.htaccess" ]; then
@@ -142,7 +142,7 @@ main() {
                 fi
                 ;;
         esac
-    done < <(find "$module_path" \( -path "*/vendor" -o -path "*/node_modules" -o -path "*/.github" -o -path "*/.git" -o -path "*/translations" -o -path "*/tests" \) -prune -o -name "*.php" ! -name "index.php" ! -name "*cs-fixer*" -type f -print0)
+    done < <(find "$module_path" \( -path "*/vendor" -o -path "*/node_modules" -o -path "*/.github" -o -path "*/.git" -o -path "*/translations" -o -path "*/tests" -o -path "*/override" \) -prune -o -name "*.php" ! -name "index.php" ! -name "*cs-fixer*" -type f -print0)
 
     # 5. Check .htaccess in log directories
     for log_dir in "$module_path/log" "$module_path/logs"; do
