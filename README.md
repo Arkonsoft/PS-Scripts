@@ -83,6 +83,17 @@ Tworzy pliki `index.php` we wszystkich podkatalogach dla bezpieczeństwa.
 ps:module-index
 ```
 
+### `ps:module-htaccess`
+Tworzy brakujące pliki `.htaccess` w katalogu modułu oraz w katalogach `log` i `logs`.
+- Dodaje standardowy plik `.htaccess` chroniący pliki PHP w katalogu głównym modułu
+- Dodaje rozszerzoną wersję `.htaccess` w katalogach `log`/`logs`, blokując dostęp do plików PHP i LOG
+- Pomija katalogi systemowe (`vendor`, `node_modules`, `.git`, `.github`, `translations`, `override`, `tests`)
+- Nie nadpisuje istniejących plików `.htaccess`
+
+```bash
+ps:module-htaccess
+```
+
 ## 🛠️ Użycie
 
 Wszystkie komendy są dostępne globalnie po instalacji. Uruchom je z dowolnego katalogu:
