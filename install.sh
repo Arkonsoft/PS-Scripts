@@ -82,7 +82,7 @@ install_scripts() {
     
     # Download scripts
     log_info "Downloading scripts from repository..."
-    for script in check.sh create.sh docker-create.sh index.sh license.sh loader.sh; do
+    for script in check.sh create.sh docker-create.sh index.sh license.sh htaccess.sh loader.sh; do
         log_info "Downloading $script..."
         if curl -s -f -o "$SCRIPTS_DIR/$script" "$REPO_URL/scripts/$script"; then
             chmod +x "$SCRIPTS_DIR/$script"
@@ -117,6 +117,7 @@ install_scripts() {
     log_info "  ps:docker-create   # Setup Docker configuration for PrestaShop"
     log_info "  ps:module-license  # Check licenses in files"
     log_info "  ps:module-index    # Create index.php files in subdirectories"
+    log_info "  ps:module-htaccess # Create missing .htaccess files for module and log directories"
 }
 
 # Always use GitHub installation mode for consistency
