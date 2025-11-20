@@ -29,6 +29,18 @@ check_file_exists() {
     fi
 }
 
+# Function to check if index.php exists and is not empty
+check_index_file() {
+    local file_path="$1"
+    if [ ! -f "$file_path" ]; then
+        log_error "Missing required file: $file_path"
+        error_count=$((error_count + 1))
+    elif [ ! -s "$file_path" ]; then
+        log_error "index.php cannot be empty: $file_path"
+        error_count=$((error_count + 1))
+    fi
+}
+
 # Function to check if .htaccess exists and is not empty
 check_htaccess_file() {
     local file_path="$1"
@@ -96,10 +108,7 @@ main() {
     # 1. Check for index.php in all directories (except excluded directories)
     excluded_dirs=("vendor" "node_modules" ".github" ".git")
     while IFS= read -r -d '' dir; do
-        if [ ! -f "$dir/index.php" ]; then
-            log_error "Missing required file: $dir/index.php"
-            error_count=$((error_count + 1))
-        fi
+        check_index_file "$dir/index.php"
     done < <(find "$module_path" -type d \( -name "vendor" -o -name "node_modules" -o -name ".github" -o -name ".git" -o -name ".webpack" \) -prune -o -type d -print0)
 
     # 2. Check .htaccess in main module directory
