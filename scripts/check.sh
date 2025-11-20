@@ -25,13 +25,19 @@ log_error() {
 # Function to check if a file exists
 check_file_exists() {
     if [ ! -f "$1" ]; then
-        if echo "$1" | grep -q "index.php"; then
-            log_error "Missing required file: $1"
-        elif echo "$1" | grep -q ".htaccess"; then
-            log_error "Missing required file: $1"
-        else
-            log_error "Missing required file: $1"
-        fi
+        log_error "Missing required file: $1"
+    fi
+}
+
+# Function to check if .htaccess exists and is not empty
+check_htaccess_file() {
+    local file_path="$1"
+    if [ ! -f "$file_path" ]; then
+        log_error "Missing required file: $file_path"
+        error_count=$((error_count + 1))
+    elif [ ! -s "$file_path" ]; then
+        log_error ".htaccess cannot be empty: $file_path"
+        error_count=$((error_count + 1))
     fi
 }
 
@@ -97,10 +103,7 @@ main() {
     done < <(find "$module_path" -type d \( -name "vendor" -o -name "node_modules" -o -name ".github" -o -name ".git" -o -name ".webpack" \) -prune -o -type d -print0)
 
     # 2. Check .htaccess in main module directory
-    if [ ! -f "$module_path/.htaccess" ]; then
-        log_error "Missing required file: $module_path/.htaccess"
-        error_count=$((error_count + 1))
-    fi
+    check_htaccess_file "$module_path/.htaccess"
 
     # 3. Check for logo.png
     if [ ! -f "$module_path/logo.png" ]; then
@@ -147,10 +150,7 @@ main() {
     # 5. Check .htaccess in log directories
     for log_dir in "$module_path/log" "$module_path/logs"; do
         if [ -d "$log_dir" ]; then
-            if [ ! -f "$log_dir/.htaccess" ]; then
-                log_error "Missing required file: $log_dir/.htaccess"
-                error_count=$((error_count + 1))
-            fi
+            check_htaccess_file "$log_dir/.htaccess"
         fi
     done
 
