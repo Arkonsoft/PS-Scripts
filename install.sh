@@ -82,7 +82,7 @@ install_scripts() {
     
     # Download scripts
     log_info "Downloading scripts from repository..."
-    for script in check.sh create.sh docker-create.sh index.sh license.sh htaccess.sh loader.sh; do
+    for script in check.sh check-debug.sh create.sh docker-create.sh index.sh license.sh htaccess.sh loader.sh; do
         log_info "Downloading $script..."
         if curl -s -f -o "$SCRIPTS_DIR/$script" "$REPO_URL/scripts/$script"; then
             chmod +x "$SCRIPTS_DIR/$script"

@@ -40,6 +40,16 @@ Sprawdza poprawność instalacji modułu PrestaShop w bieżącym katalogu.
 ps:module-check
 ```
 
+### `ps:check-debug`
+Skanuje katalogi `themes` oraz `modules` i wyszukuje typowe ślady debugowania.
+- Szuka wzorców takich jak `{debug}`, `var_dump(`, `dump(`, `console.log(`, `debugger;`
+- Pomija katalogi systemowe (`vendor`, `node_modules`, `.git`, `.github`) oraz pliki zminifikowane
+- Kończy działanie kodem wyjścia `1`, jeśli znajdzie debug w plikach
+
+```bash
+ps:check-debug
+```
+
 ### `ps:module-create`
 Tworzy nowy moduł PrestaShop z kompletną strukturą katalogów i plików.
 - Generuje podstawowe pliki modułu
