@@ -45,9 +45,14 @@ Skanuje katalogi `themes` oraz `modules` i wyszukuje typowe ślady debugowania.
 - Szuka wzorców takich jak `{debug}`, `var_dump(`, `dump(`, `console.log(`, `debugger;`
 - Pomija katalogi systemowe (`vendor`, `node_modules`, `.git`, `.github`) oraz pliki zminifikowane
 - Kończy działanie kodem wyjścia `1`, jeśli znajdzie debug w plikach
+- Obsługuje dodatkowe instalacje PrestaShop dzięki opcji `--ip-path`, która skanuje katalogi `themes` i `modules` we wskazanych lokalizacjach
 
 ```bash
+# Podstawowe użycie w bieżącym katalogu
 ps:check-debug
+
+# Dodatkowe instalacje (np. katalogi IP)
+ps:check-debug --ip-path /var/www/ip1 --ip-path /var/www/ip2
 ```
 
 ### `ps:module-create`
