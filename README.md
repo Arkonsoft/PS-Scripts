@@ -45,9 +45,13 @@ Skanuje katalogi `themes` oraz `modules` i wyszukuje typowe ślady debugowania.
 - Szuka wzorców takich jak `{debug}`, `var_dump(`, `dump(`, `console.log(`, `debugger;`
 - Pomija katalogi systemowe (`vendor`, `node_modules`, `.git`, `.github`) oraz pliki zminifikowane
 - Kończy działanie kodem wyjścia `1`, jeśli znajdzie debug w plikach
+- Pozwala pominąć wskazane ścieżki dzięki opcji `--exclude <ścieżka>` (można podawać wielokrotnie)
 
 ```bash
 ps:check-debug
+
+# przykład z wykluczeniem katalogu i pojedynczego pliku
+ps:check-debug --exclude modules/moj-modul/tests --exclude themes/classic/modules/sample.php
 ```
 
 ### `ps:module-create`
