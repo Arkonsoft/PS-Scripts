@@ -1,4 +1,3 @@
-cat > .gitattributes << 'EOF'
 # Domyślne zachowanie: automatyczna konwersja do LF przy commitach
 * text=auto eol=lf
 
@@ -8,4 +7,3 @@ cat > .gitattributes << 'EOF'
 # Wymuszanie LF dla plików konfiguracyjnych i dokumentacji
 *.md text eol=lf
 *.json text eol=lf
-EOF

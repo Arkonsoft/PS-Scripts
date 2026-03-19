@@ -3,6 +3,13 @@
 # Simple text-based output without colors
 set -euo pipefail
 
+# Zapamiętanie ścieżki początkowej i bezpieczny powrót na końcu (lub w przypadku błędu)
+START_DIR=$(pwd)
+cleanup() {
+    cd "$START_DIR" || exit 1
+}
+trap cleanup EXIT
+
 # Logging functions
 log_info() {
     printf "[INFO] %s\n" "$1"
@@ -41,7 +48,7 @@ if [ -d "$NEW_DIR_NAME" ]; then
     exit 1
 fi
 
-# 1. Normalizacja wejścia
+# Normalizacja wejścia
 normalize() {
     echo "$1" | sed -E 's/([a-z])([A-Z])/\1 \2/g' | tr '_-' '  ' | tr '[:upper:]' '[:lower:]' | tr -s ' '
 }
@@ -49,7 +56,7 @@ normalize() {
 OLD_NORM=$(normalize "$OLD_DIR_NAME")
 NEW_NORM=$(normalize "$NEW_DIR_NAME")
 
-# 2. Generowanie wariantów
+# Generowanie wariantów
 generate_variants() {
     local norm_str="$1"
     
@@ -70,22 +77,34 @@ NEW_VARS=("$NEW_UPPER" "$NEW_PASCAL" "$NEW_CAMEL" "$NEW_SNAKE" "$NEW_LOWER")
 
 log_info "Rozpoczynam modyfikację modułu: $OLD_DIR_NAME"
 
-# 3. Podmiana tekstu w plikach
+# Podmiana tekstu w plikach
 replace_text() {
     local search_text="$1"
     local replace_text="$2"
     
     if [ -z "$search_text" ] || [ "$search_text" = "$replace_text" ]; then return; fi
     
+    # Escape dla bezpieczeństwa
+    local search_escaped
+    local replace_escaped
+    search_escaped=$(printf '%s' "$search_text" | sed 's/[.[\*^$\/&\\]/\\&/g')
+    replace_escaped=$(printf '%s' "$replace_text" | sed 's/[&\\/]/\\&/g')
+    
     while IFS= read -r -d '' file; do
-        if grep -q "$search_text" "$file"; then
-            sed -i.bak "s/$search_text/$replace_text/g" "$file"
+        if grep -F -q -- "$search_text" "$file"; then
+            sed -i.bak "s/${search_escaped}/${replace_escaped}/g" "$file"
             rm -f "${file}.bak"
         fi
-    done < <(find "$OLD_DIR_NAME" -type f -not -path "*/\.*" -not -path "*/vendor/*" -not -path "*/node_modules/*" -print0)
+    done < <(find "$OLD_DIR_NAME" -type f \( \
+        -name "*.php"  -o -name "*.tpl"  -o -name "*.html" -o -name "*.htm"  -o \
+        -name "*.js"   -o -name "*.css"  -o -name "*.scss" -o -name "*.less" -o \
+        -name "*.json" -o -name "*.yml"  -o -name "*.yaml" -o -name "*.xml"  -o \
+        -name "*.md"   -o -name "*.txt"  -o -name "*.ini"  -o -name "*.sh"   -o \
+        -name "*.twig" \
+    \) -not -path "*/\.*" -not -path "*/vendor/*" -not -path "*/node_modules/*" -print0)
 }
 
-# 4. Zmiana nazw plików i katalogów (bez katalogu głównego!)
+# Zmiana nazw plików i katalogów (bez katalogu głównego!)
 rename_items() {
     local search_text="$1"
     local replace_text="$2"
@@ -115,12 +134,12 @@ for i in "${!OLD_VARS[@]}"; do
     rename_items "${OLD_VARS[$i]}" "${NEW_VARS[$i]}"
 done
 
-# 5. Zmiana nazwy głównego katalogu na samym końcu
+# Zmiana nazwy głównego katalogu na samym końcu
 log_info "Zmiana nazwy głównego katalogu modułu..."
 mv "$OLD_DIR_NAME" "$NEW_DIR_NAME"
 log_success "Zmieniono nazwę folderu na: $NEW_DIR_NAME"
 
-# 6. Weryfikacja gotowego modułu
+# Weryfikacja gotowego modułu
 log_info "Weryfikacja struktury modułu..."
 
 # Przechodzimy do nowego folderu tylko na czas testu
@@ -133,8 +152,5 @@ elif [ -f "./check.sh" ]; then
 else
     log_warning "Pominięto automatyczną weryfikację. Brak skryptu check.sh."
 fi
-
-# Wracamy do folderu nadrzędnego (modules)
-cd ..
 
 log_success "Proces zmiany nazwy zakończony sukcesem! Nazwa modułu $OLD_DIR_NAME została pomyślnie zmieniona na: $NEW_DIR_NAME"
