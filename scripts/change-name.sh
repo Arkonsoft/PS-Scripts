@@ -24,23 +24,32 @@ log_error() {
     printf "[ERROR] %s\n" "$1" >&2
 }
 
+# Walidacja kontekstu uruchomienia
+CURRENT_DIR_NAME=$(basename "$PWD")
+if [ "$CURRENT_DIR_NAME" != "modules" ]; then
+    log_error "Skrypt należy uruchamiać w katalogu 'modules/'"
+    exit 1
+fi
+
 # Walidacja wejścia
 if [ $# -lt 2 ]; then
     log_error "Użycie: ps:module-change-name <ObecnaNazwaModułu> <NazwaNowaModułu>"
-    log_info "Przykład: ps:module-change-name arkon_test DediNewModule"
+    log_info "Przykład: ps:module-change-name ArkonTest ArkonNewModule"
     exit 1
 fi
 
+# Normalizacja wejścia
 INPUT_OLD="${1%/}"
 INPUT_NEW="$2"
 
-# Lokalizacja folderu (wyszukiwanie ignorujące wielkość liter)
-OLD_DIR_NAME=$(find . -maxdepth 1 -type d -iname "$INPUT_OLD" -printf '%f\n' -quit)
+# Lokalizacja folderu
+OLD_DIR_PATH=$(find . -maxdepth 1 -type d -iname "$INPUT_OLD" -print -quit)
 
-if [ -z "$OLD_DIR_NAME" ]; then
+if [ -z "$OLD_DIR_PATH" ]; then
     log_error "Nie znaleziono folderu pasującego do '$INPUT_OLD' w bieżącej lokalizacji."
     exit 1
 fi
+OLD_DIR_NAME=$(basename "$OLD_DIR_PATH")
 
 # Inicjalizacja liczników
 FILES_CHANGED=0
@@ -65,17 +74,17 @@ MAIN_PHP="$OLD_DIR_NAME/$OLD_DIR_NAME.php"
 OLD_PASCAL=""
 
 if [ -f "$MAIN_PHP" ]; then
-    # Wyciąga nazwę klasy bezpośrednio z definicji PHP
-    OLD_PASCAL=$(grep -m 1 "^class " "$MAIN_PHP" | sed -E 's/.*class ([a-zA-Z0-9_]+).*/\1/' || echo "")
+    # Wyciąga nazwę klasy (obsługuje wcięcia oraz final/abstract)
+    OLD_PASCAL=$(grep -m 1 -E '^[[:space:]]*(final[[:space:]]+|abstract[[:space:]]+)?class[[:space:]]+' "$MAIN_PHP" | sed -E 's/.*class[[:space:]]+([a-zA-Z0-9_]+).*/\1/' || echo "")
 fi
 
-# Fallback: jeśli nie wykryto klasy, zgadujemy na podstawie nazwy folderu
+# Fallback
 if [ -z "$OLD_PASCAL" ]; then
     OLD_PASCAL=$(tokenize "$OLD_DIR_NAME" | awk '{for(i=1;i<=NF;i++) printf toupper(substr($i,1,1)) tolower(substr($i,2));}')
-    log_warning "Nie wykryto klasy w $MAIN_PHP. Użyto wygenerowanej nazwy: $OLD_PASCAL"
+    log_warning "Nie wykryto klasy. Użyto wygenerowanej nazwy: $OLD_PASCAL"
 fi
 
-# Ustalanie nowej nazwy (PascalCase)
+# Ustalanie nowej nazwy
 NEW_PASCAL=$(tokenize "$INPUT_NEW" | awk '{for(i=1;i<=NF;i++) printf toupper(substr($i,1,1)) tolower(substr($i,2));}')
 
 # Generowanie mapy wariantów
@@ -96,21 +105,23 @@ for i in "${!OLD_VARS[@]}"; do
     
     [ "$search" == "$replace" ] && continue
 
-    # Escapowanie znaków dla sed
     search_esc=$(printf '%s' "$search" | sed 's/[.[\*^$\/&\\]/\\&/g')
     replace_esc=$(printf '%s' "$replace" | sed 's/[&\\/]/\\&/g')
     
-    # Przeszukiwanie i podmiana z wykluczeniem folderów systemowych
     while IFS= read -r -d '' file; do
-        if grep -F -q "$search" "$file"; then
-            sed -i "s/${search_esc}/${replace_esc}/g" "$file"
+        if grep -F -q -- "$search" "$file"; then
+            # Kompatybilne z GNU/BSD sed
+            sed -i.bak "s/${search_esc}/${replace_esc}/g" "$file"
             FILES_CHANGED=$((FILES_CHANGED + 1))
         fi
-    done < <(find "$OLD_DIR_NAME" -type f \( -name "*.php" -o -name "*.tpl" -o -name "*.json" -o -name "*.yml" -o -name "*.md" -o -name "*.js" -o -name "*.css" \) \
+    done < <(find "$OLD_DIR_NAME" -type f \( -name "*.php" -o -name "*.tpl" -o -name "*.json" -o -name "*.yml" -o -name "*.yaml" -o -name "*.xml" -o -name "*.md" -o -name "*.js" -o -name "*.css" -o -name "*.scss" -o -name "*.less" -o -name "*.ini" -o -name "*.txt" -o -name "*.twig" \) \
         -not -path "*/vendor/*" -not -path "*/node_modules/*" -not -path "*/.git/*" -print0)
 done
 
-# Zmiana nazw plików i podkatalogów
+# Usuwanie plików tymczasowych sed
+find "$OLD_DIR_NAME" -type f -name "*.bak" -delete 2>/dev/null || true
+
+# Zmiana nazw plików i katalogów
 log_info "Zmiana nazw plików i katalogów..."
 
 for i in "${!OLD_VARS[@]}"; do
@@ -127,29 +138,32 @@ for i in "${!OLD_VARS[@]}"; do
             mv "$item" "$dir/$new_base"
             NAMES_RENAMED=$((NAMES_RENAMED + 1))
         fi
-    done < <(find "$OLD_DIR_NAME" -mindepth 1 -depth -name "*$search*" -not -path "*/vendor/*" -print0)
+    done < <(find "$OLD_DIR_NAME" -mindepth 1 -depth -name "*$search*" -not -path "*/vendor/*" -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/.*/*" -print0)
 done
 
-# Finalizacja: Zmiana katalogu głównego
-NEW_DIR_NAME="$N_LOWER"
+# Finalizacja: Zmiana katalogu głównego (Presta-friendly naming)
+if [[ "$OLD_DIR_NAME" == *"_"* ]]; then
+    NEW_DIR_NAME="$N_SNAKE"
+else
+    NEW_DIR_NAME="$N_LOWER"
+fi
 
-# Zabezpieczenie przed zagnieżdżaniem folderów
 if [ -d "$NEW_DIR_NAME" ] && [ "$OLD_DIR_NAME" != "$NEW_DIR_NAME" ]; then
-    log_error "Błąd: Katalog docelowy '$NEW_DIR_NAME' już istnieje. Przerwano zmianę nazwy folderu głównego, aby uniknąć zagnieżdżenia."
+    log_error "Błąd: Katalog docelowy '$NEW_DIR_NAME' już istnieje. Przerwano."
     exit 1
 fi
 
 mv "$OLD_DIR_NAME" "$NEW_DIR_NAME"
 
-log_success "Proces zakończony pomyślnie! Zmieniono nazwę modułu $OLD_DIR_NAME na $NEW_DIR_NAME"
-log_info "Podsumowanie zmian:"
-log_success "- Nowa nazwa modułu: $NEW_DIR_NAME"
-log_success "- Nowa nazwa klasy: $NEW_PASCAL"
+log_success "Proces zakończony pomyślnie!"
+log_info "Podsumowanie:"
+log_success "- Nowy folder: $NEW_DIR_NAME"
+log_success "- Nowa klasa: $NEW_PASCAL"
 log_warning "- Zmodyfikowane pliki: $FILES_CHANGED"
-log_warning "- Zmienione nazwy elementów: $NAMES_RENAMED"
+log_warning "- Zmienione nazwy: $NAMES_RENAMED"
 
 # Automatyczna weryfikacja
-log_info "Uruchamianie weryfikacji po zmianie nazwy..."
+log_info "Uruchamianie weryfikacji..."
 cd "$NEW_DIR_NAME"
 if [ -f "../check.sh" ]; then
     ../check.sh
