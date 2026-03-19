@@ -1,16 +1,13 @@
 #!/bin/bash
 
-# Simple text-based output without colors
 set -euo pipefail
 
-# Zapamiętanie ścieżki początkowej i bezpieczny powrót na końcu (lub w przypadku błędu)
+# Zapamiętanie ścieżki początkowej dla bezpiecznego powrotu
 START_DIR=$(pwd)
-cleanup() {
-    cd "$START_DIR" || exit 1
-}
+cleanup() { cd "$START_DIR" || exit 1; }
 trap cleanup EXIT
 
-# Logging functions
+# Funkcje logowania
 log_info() {
     printf "[INFO] %s\n" "$1"
 }
@@ -27,130 +24,137 @@ log_error() {
     printf "[ERROR] %s\n" "$1" >&2
 }
 
+# Walidacja wejścia
 if [ $# -lt 2 ]; then
-    log_error "Użycie: $0 <stara_nazwa> <nowa_nazwa>"
-    log_info "Skrypt należy uruchamiać w katalogu 'modules/'"
-    log_info "Przykład: $0 arkon_example arkon_super_module"
+    log_error "Użycie: ps:module-change-name <ObecnaNazwaModułu> <NazwaNowaModułu>"
+    log_info "Przykład: ps:module-change-name arkon_test DediNewModule"
     exit 1
 fi
 
-# Usuwamy ewentualne ukośniki na końcu podane przez autouzupełnianie (np. arkon_example/)
-OLD_DIR_NAME="${1%/}"
-NEW_DIR_NAME="${2%/}"
+INPUT_OLD="${1%/}"
+INPUT_NEW="$2"
 
-if [ ! -d "$OLD_DIR_NAME" ]; then
-    log_error "Błąd: Katalog modułu '$OLD_DIR_NAME' nie istnieje w obecnej lokalizacji."
+# Lokalizacja folderu (wyszukiwanie ignorujące wielkość liter)
+OLD_DIR_NAME=$(find . -maxdepth 1 -type d -iname "$INPUT_OLD" -printf '%f\n' -quit)
+
+if [ -z "$OLD_DIR_NAME" ]; then
+    log_error "Nie znaleziono folderu pasującego do '$INPUT_OLD' w bieżącej lokalizacji."
     exit 1
 fi
 
-if [ -d "$NEW_DIR_NAME" ]; then
-    log_error "Błąd: Katalog docelowy '$NEW_DIR_NAME' już istnieje. Przerwano."
-    exit 1
-fi
+# Inicjalizacja liczników
+FILES_CHANGED=0
+NAMES_RENAMED=0
 
-# Normalizacja wejścia
-normalize() {
-    echo "$1" | sed -E 's/([a-z])([A-Z])/\1 \2/g' | tr '_-' '  ' | tr '[:upper:]' '[:lower:]' | tr -s ' '
+# Narzędzia do transformacji tekstu
+tokenize() {
+    echo "$1" | sed -E 's/([a-z0-9])([A-Z])/\1 \2/g' | tr '_-' '  ' | tr '[:upper:]' '[:lower:]' | tr -s ' '
 }
 
-OLD_NORM=$(normalize "$OLD_DIR_NAME")
-NEW_NORM=$(normalize "$NEW_DIR_NAME")
-
-# Generowanie wariantów
-generate_variants() {
-    local norm_str="$1"
-    
-    local pascal=$(echo "$norm_str" | awk '{for(i=1;i<=NF;i++) printf toupper(substr($i,1,1)) tolower(substr($i,2));} END{print ""}')
-    local camel=$(echo "$pascal" | awk '{print tolower(substr($0,1,1)) substr($0,2)}')
-    local snake=$(echo "$norm_str" | tr ' ' '_')
-    local upper_snake=$(echo "$snake" | tr '[:lower:]' '[:upper:]')
-    local lower=$(echo "$norm_str" | tr -d ' ')
-
-    echo "$upper_snake $pascal $camel $snake $lower"
+get_formats() {
+    local p="$1" # PascalCase
+    local s=$(echo "$p" | sed -E 's/([a-z0-9])([A-Z])/\1_\2/g' | tr '[:upper:]' '[:lower:]')
+    local c=$(echo "$p" | awk '{print tolower(substr($0,1,1)) substr($0,2)}')
+    local u=$(echo "$s" | tr '[:lower:]' '[:upper:]')
+    local l=$(echo "$s" | tr -d '_')
+    echo "$u $p $c $s $l"
 }
 
-read -r OLD_UPPER OLD_PASCAL OLD_CAMEL OLD_SNAKE OLD_LOWER <<< "$(generate_variants "$OLD_NORM")"
-read -r NEW_UPPER NEW_PASCAL NEW_CAMEL NEW_SNAKE NEW_LOWER <<< "$(generate_variants "$NEW_NORM")"
+# Detekcja nazw (Źródło prawdy: klasa w głównym pliku PHP)
+MAIN_PHP="$OLD_DIR_NAME/$OLD_DIR_NAME.php"
+OLD_PASCAL=""
 
-OLD_VARS=("$OLD_UPPER" "$OLD_PASCAL" "$OLD_CAMEL" "$OLD_SNAKE" "$OLD_LOWER")
-NEW_VARS=("$NEW_UPPER" "$NEW_PASCAL" "$NEW_CAMEL" "$NEW_SNAKE" "$NEW_LOWER")
+if [ -f "$MAIN_PHP" ]; then
+    # Wyciąga nazwę klasy bezpośrednio z definicji PHP
+    OLD_PASCAL=$(grep -m 1 "^class " "$MAIN_PHP" | sed -E 's/.*class ([a-zA-Z0-9_]+).*/\1/' || echo "")
+fi
 
-log_info "Rozpoczynam modyfikację modułu: $OLD_DIR_NAME"
+# Fallback: jeśli nie wykryto klasy, zgadujemy na podstawie nazwy folderu
+if [ -z "$OLD_PASCAL" ]; then
+    OLD_PASCAL=$(tokenize "$OLD_DIR_NAME" | awk '{for(i=1;i<=NF;i++) printf toupper(substr($i,1,1)) tolower(substr($i,2));}')
+    log_warning "Nie wykryto klasy w $MAIN_PHP. Użyto wygenerowanej nazwy: $OLD_PASCAL"
+fi
 
-# Podmiana tekstu w plikach
-replace_text() {
-    local search_text="$1"
-    local replace_text="$2"
+# Ustalanie nowej nazwy (PascalCase)
+NEW_PASCAL=$(tokenize "$INPUT_NEW" | awk '{for(i=1;i<=NF;i++) printf toupper(substr($i,1,1)) tolower(substr($i,2));}')
+
+# Generowanie mapy wariantów
+read -r O_UPPER O_PASCAL O_CAMEL O_SNAKE O_LOWER <<< "$(get_formats "$OLD_PASCAL")"
+read -r N_UPPER N_PASCAL N_CAMEL N_SNAKE N_LOWER <<< "$(get_formats "$NEW_PASCAL")"
+
+OLD_VARS=("$O_UPPER" "$O_PASCAL" "$O_CAMEL" "$O_SNAKE" "$O_LOWER")
+NEW_VARS=("$N_UPPER" "$N_PASCAL" "$N_CAMEL" "$N_SNAKE" "$N_LOWER")
+
+log_info "Zidentyfikowano moduł: $OLD_PASCAL -> $NEW_PASCAL"
+
+# Proces podmiany zawartości
+log_info "Aktualizacja zawartości plików..."
+
+for i in "${!OLD_VARS[@]}"; do
+    search="${OLD_VARS[$i]}"
+    replace="${NEW_VARS[$i]}"
     
-    if [ -z "$search_text" ] || [ "$search_text" = "$replace_text" ]; then return; fi
+    [ "$search" == "$replace" ] && continue
+
+    # Escapowanie znaków dla sed
+    search_esc=$(printf '%s' "$search" | sed 's/[.[\*^$\/&\\]/\\&/g')
+    replace_esc=$(printf '%s' "$replace" | sed 's/[&\\/]/\\&/g')
     
-    # Escape dla bezpieczeństwa
-    local search_escaped
-    local replace_escaped
-    search_escaped=$(printf '%s' "$search_text" | sed 's/[.[\*^$\/&\\]/\\&/g')
-    replace_escaped=$(printf '%s' "$replace_text" | sed 's/[&\\/]/\\&/g')
-    
+    # Przeszukiwanie i podmiana z wykluczeniem folderów systemowych
     while IFS= read -r -d '' file; do
-        if grep -F -q -- "$search_text" "$file"; then
-            sed -i.bak "s/${search_escaped}/${replace_escaped}/g" "$file"
-            rm -f "${file}.bak"
+        if grep -F -q "$search" "$file"; then
+            sed -i "s/${search_esc}/${replace_esc}/g" "$file"
+            FILES_CHANGED=$((FILES_CHANGED + 1))
         fi
-    done < <(find "$OLD_DIR_NAME" -type f \( \
-        -name "*.php"  -o -name "*.tpl"  -o -name "*.html" -o -name "*.htm"  -o \
-        -name "*.js"   -o -name "*.css"  -o -name "*.scss" -o -name "*.less" -o \
-        -name "*.json" -o -name "*.yml"  -o -name "*.yaml" -o -name "*.xml"  -o \
-        -name "*.md"   -o -name "*.txt"  -o -name "*.ini"  -o -name "*.sh"   -o \
-        -name "*.twig" \
-    \) -not -path "*/\.*" -not -path "*/vendor/*" -not -path "*/node_modules/*" -print0)
-}
+    done < <(find "$OLD_DIR_NAME" -type f \( -name "*.php" -o -name "*.tpl" -o -name "*.json" -o -name "*.yml" -o -name "*.md" -o -name "*.js" -o -name "*.css" \) \
+        -not -path "*/vendor/*" -not -path "*/node_modules/*" -not -path "*/.git/*" -print0)
+done
 
-# Zmiana nazw plików i katalogów (bez katalogu głównego!)
-rename_items() {
-    local search_text="$1"
-    local replace_text="$2"
+# Zmiana nazw plików i podkatalogów
+log_info "Zmiana nazw plików i katalogów..."
+
+for i in "${!OLD_VARS[@]}"; do
+    search="${OLD_VARS[$i]}"
+    replace="${NEW_VARS[$i]}"
     
-    if [ -z "$search_text" ] || [ "$search_text" = "$replace_text" ]; then return; fi
-    
-    # Używamy -mindepth 1 aby nie zmieniać nazwy głównego folderu podczas pętli
+    [ "$search" == "$replace" ] && continue
+
     while IFS= read -r -d '' item; do
         dir=$(dirname "$item")
         base=$(basename "$item")
-        
-        if [[ "$base" == *"$search_text"* ]]; then
-            new_base="${base//$search_text/$replace_text}"
-            log_warning " Zmieniono: $base -> $new_base"
+        if [[ "$base" == *"$search"* ]]; then
+            new_base="${base//$search/$replace}"
             mv "$item" "$dir/$new_base"
+            NAMES_RENAMED=$((NAMES_RENAMED + 1))
         fi
-    done < <(find "$OLD_DIR_NAME" -mindepth 1 -depth -name "*$search_text*" -not -path "*/\.*" -not -path "*/vendor/*" -not -path "*/node_modules/*" -print0)
-}
-
-log_info "Podmiana zawartości plików..."
-for i in "${!OLD_VARS[@]}"; do
-    replace_text "${OLD_VARS[$i]}" "${NEW_VARS[$i]}"
+    done < <(find "$OLD_DIR_NAME" -mindepth 1 -depth -name "*$search*" -not -path "*/vendor/*" -print0)
 done
 
-log_info "Zmiana nazw plików i podkatalogów..."
-for i in "${!OLD_VARS[@]}"; do
-    rename_items "${OLD_VARS[$i]}" "${NEW_VARS[$i]}"
-done
+# Finalizacja: Zmiana katalogu głównego
+NEW_DIR_NAME="$N_LOWER"
 
-# Zmiana nazwy głównego katalogu na samym końcu
-log_info "Zmiana nazwy głównego katalogu modułu..."
-mv "$OLD_DIR_NAME" "$NEW_DIR_NAME"
-log_success "Zmieniono nazwę folderu na: $NEW_DIR_NAME"
-
-# Weryfikacja gotowego modułu
-log_info "Weryfikacja struktury modułu..."
-
-# Przechodzimy do nowego folderu tylko na czas testu
-cd "$NEW_DIR_NAME" || exit 1
-
-if command -v ps:module-check >/dev/null 2>&1; then
-    ps:module-check
-elif [ -f "./check.sh" ]; then
-    ./check.sh
-else
-    log_warning "Pominięto automatyczną weryfikację. Brak skryptu check.sh."
+# Zabezpieczenie przed zagnieżdżaniem folderów
+if [ -d "$NEW_DIR_NAME" ] && [ "$OLD_DIR_NAME" != "$NEW_DIR_NAME" ]; then
+    log_error "Błąd: Katalog docelowy '$NEW_DIR_NAME' już istnieje. Przerwano zmianę nazwy folderu głównego, aby uniknąć zagnieżdżenia."
+    exit 1
 fi
 
-log_success "Proces zmiany nazwy zakończony sukcesem! Nazwa modułu $OLD_DIR_NAME została pomyślnie zmieniona na: $NEW_DIR_NAME"
+mv "$OLD_DIR_NAME" "$NEW_DIR_NAME"
+
+log_success "Proces zakończony pomyślnie! Zmieniono nazwę modułu $OLD_DIR_NAME na $NEW_DIR_NAME"
+log_info "Podsumowanie zmian:"
+log_success "- Nowa nazwa modułu: $NEW_DIR_NAME"
+log_success "- Nowa nazwa klasy: $NEW_PASCAL"
+log_warning "- Zmodyfikowane pliki: $FILES_CHANGED"
+log_warning "- Zmienione nazwy elementów: $NAMES_RENAMED"
+
+# Automatyczna weryfikacja
+log_info "Uruchamianie weryfikacji po zmianie nazwy..."
+cd "$NEW_DIR_NAME"
+if [ -f "../check.sh" ]; then
+    ../check.sh
+elif command -v ps:module-check >/dev/null 2>&1; then
+    ps:module-check
+else
+    log_warning "Nie znaleziono skryptu weryfikacyjnego. Pomijanie."
+fi

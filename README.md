@@ -112,6 +112,9 @@ Zmienia nazwę modułu, podmieniając jej wystąpienia zarówno w zawartości pl
 - Pomija katalogi systemowe i ukryte (`vendor`, `node_modules`, `.git` itp.)
 - Na koniec automatycznie uruchamia weryfikację modułu (`ps:module-check`)
 
+```bash
+ps:module-change-name ArkonExample ArkonNowyModul
+```
 
 ## 🛠️ Użycie
 
