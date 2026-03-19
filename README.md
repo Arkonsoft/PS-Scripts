@@ -104,6 +104,15 @@ Tworzy brakujące pliki `.htaccess` w katalogu modułu oraz w katalogach `log` i
 ps:module-htaccess
 ```
 
+### `ps:module-change-name`
+Zmienia nazwę modułu, podmieniając jej wystąpienia zarówno w zawartości plików, jak i w nazwach plików oraz katalogów.
+- Automatycznie rozpoznaje i generuje warianty nazwy (`PascalCase`, `camelCase`, `snake_case`, `UPPER_SNAKE`, `lowercase`)
+- Podmienia tekst w bezpiecznej kolejności (od najbardziej złożonych formatów do najprostszych)
+- Zmienia nazwy plików i folderów (np. `arkonexample.php` na `arkonnowanazwa.php`)
+- Pomija katalogi systemowe i ukryte (`vendor`, `node_modules`, `.git` itp.)
+- Na koniec automatycznie uruchamia weryfikację modułu (`ps:module-check`)
+
+
 ## 🛠️ Użycie
 
 Wszystkie komendy są dostępne globalnie po instalacji. Uruchom je z dowolnego katalogu:
