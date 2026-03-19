@@ -44,6 +44,7 @@ create_wrapper "ps:docker-create" "docker-create.sh"
 create_wrapper "ps:module-license" "license.sh"
 create_wrapper "ps:module-index" "index.sh"
 create_wrapper "ps:module-htaccess" "htaccess.sh"
+create_wrapper "ps:module-change-name" "change-name.sh"
 
 # Add bin directory to PATH if not already present
 if [ -d "$BIN_DIR" ] && [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then

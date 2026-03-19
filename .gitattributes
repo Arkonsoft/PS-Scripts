@@ -1,0 +1,11 @@
+cat > .gitattributes << 'EOF'
+# Domyślne zachowanie: automatyczna konwersja do LF przy commitach
+* text=auto eol=lf
+
+# Wymuszanie uniksowych końcówek linii (LF) dla skryptów
+*.sh text eol=lf
+
+# Wymuszanie LF dla plików konfiguracyjnych i dokumentacji
+*.md text eol=lf
+*.json text eol=lf
+EOF
