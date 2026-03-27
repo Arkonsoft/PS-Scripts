@@ -22,6 +22,152 @@ log_error() {
     printf "[ERROR] %s\n" "$1" >&2
 }
 
+# Function to ensure PHP namespace is declared after allowed statements only
+check_php_namespace_structure() {
+    local file="$1"
+    local has_namespace="false"
+    local namespace_line=0
+    local line_number=0
+    local in_multiline_comment="false"
+    local line=""
+    local line_no_comment=""
+    local line_trimmed=""
+    local check_failed="false"
+
+    # First pass: detect namespace line number (ignoring comments)
+    while IFS= read -r line || [ -n "$line" ]; do
+        line_number=$((line_number + 1))
+
+        if [[ "$line" =~ /\* ]] && [[ "$line" =~ \*/ ]]; then
+            continue
+        elif [[ "$line" =~ /\* ]]; then
+            in_multiline_comment="true"
+            continue
+        elif [[ "$line" =~ \*/ ]]; then
+            in_multiline_comment="false"
+            continue
+        fi
+
+        if [ "$in_multiline_comment" = "true" ]; then
+            continue
+        fi
+
+        line_no_comment=$(echo "$line" | sed 's|//.*||')
+        line_trimmed=$(echo "$line_no_comment" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+        [ -z "$line_trimmed" ] && continue
+
+        if [[ "$line_trimmed" =~ ^namespace[[:space:]]+ ]]; then
+            has_namespace="true"
+            namespace_line=$line_number
+            break
+        fi
+    done < "$file"
+
+    if [ "$has_namespace" = "false" ]; then
+        return 0
+    fi
+
+    # Second pass: ensure only allowed statements exist before namespace
+    line_number=0
+    in_multiline_comment="false"
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        line_number=$((line_number + 1))
+
+        if [ "$line_number" -ge "$namespace_line" ]; then
+            break
+        fi
+
+        if [[ "$line" =~ /\* ]] && [[ "$line" =~ \*/ ]]; then
+            continue
+        elif [[ "$line" =~ /\* ]]; then
+            in_multiline_comment="true"
+            continue
+        elif [[ "$line" =~ \*/ ]]; then
+            in_multiline_comment="false"
+            continue
+        fi
+
+        if [ "$in_multiline_comment" = "true" ]; then
+            continue
+        fi
+
+        line_no_comment=$(echo "$line" | sed 's|//.*||')
+        line_trimmed=$(echo "$line_no_comment" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+        [ -z "$line_trimmed" ] && continue
+
+        if [[ "$line_trimmed" =~ ^\<\?php ]] || [[ "$line_trimmed" = "<?php" ]] || [[ "$line_trimmed" =~ ^\<\?\= ]]; then
+            continue
+        fi
+
+        if [[ "$line_trimmed" =~ ^declare[[:space:]]*\([[:space:]]*strict_types[[:space:]]*=[[:space:]]*1[[:space:]]*\)[[:space:]]*\;?[[:space:]]*$ ]]; then
+            continue
+        fi
+
+        log_error "PHP file has content before namespace declaration (only comments and declare strict allowed): $file (line $line_number: $line_trimmed)"
+        check_failed="true"
+        break
+    done < "$file"
+
+    # Third pass: ensure file contains code beyond namespace/declare/comments
+    if [ "$check_failed" = "false" ]; then
+        local has_other_content="false"
+        line_number=0
+        in_multiline_comment="false"
+
+        while IFS= read -r line || [ -n "$line" ]; do
+            line_number=$((line_number + 1))
+
+            if [[ "$line" =~ /\* ]] && [[ "$line" =~ \*/ ]]; then
+                continue
+            elif [[ "$line" =~ /\* ]]; then
+                in_multiline_comment="true"
+                continue
+            elif [[ "$line" =~ \*/ ]]; then
+                in_multiline_comment="false"
+                continue
+            fi
+
+            if [ "$in_multiline_comment" = "true" ]; then
+                continue
+            fi
+
+            line_no_comment=$(echo "$line" | sed 's|//.*||')
+            line_trimmed=$(echo "$line_no_comment" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+            [ -z "$line_trimmed" ] && continue
+
+            if [[ "$line_trimmed" =~ ^\<\?php ]] || [[ "$line_trimmed" = "<?php" ]] || [[ "$line_trimmed" =~ ^\<\?\= ]]; then
+                continue
+            fi
+
+            if [[ "$line_trimmed" =~ ^declare[[:space:]]*\([[:space:]]*strict_types[[:space:]]*=[[:space:]]*1[[:space:]]*\)[[:space:]]*\;?[[:space:]]*$ ]]; then
+                continue
+            fi
+
+            if [[ "$line_trimmed" =~ ^namespace[[:space:]]+ ]]; then
+                continue
+            fi
+
+            has_other_content="true"
+            break
+        done < "$file"
+
+        if [ "$has_other_content" = "false" ]; then
+            log_error "PHP file contains only declare strict and/or namespace (no actual code): $file"
+            check_failed="true"
+        fi
+    fi
+
+    if [ "$check_failed" = "true" ]; then
+        return 1
+    fi
+
+    return 0
+}
+
 # Function to check if a file exists
 check_file_exists() {
     if [ ! -f "$1" ]; then
@@ -129,6 +275,10 @@ main() {
         
         if ! grep -q "NOTICE OF LICENSE" "$php_file"; then
             log_error "Missing license notice in: $php_file"
+            error_count=$((error_count + 1))
+        fi
+
+        if ! check_php_namespace_structure "$php_file"; then
             error_count=$((error_count + 1))
         fi
         
