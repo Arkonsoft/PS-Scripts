@@ -28,6 +28,45 @@ PATTERNS=(
 )
 
 SEARCH_ROOTS=("themes" "modules")
+IP_PATHS=()
+
+usage() {
+    cat <<'EOF'
+Usage: ps:check-debug [OPTIONS]
+
+Options:
+  -i, --ip-path PATH   Path to a PrestaShop installation directory. Can be repeated.
+  -h, --help           Show this help message and exit.
+
+When IP paths are provided, their modules/ and themes/ directories are scanned
+in addition to the current working directory.
+EOF
+}
+
+parse_args() {
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -i|--ip-path)
+                if [ $# -lt 2 ]; then
+                    log_error "Missing value for $1 option."
+                    usage
+                    exit 1
+                fi
+                IP_PATHS+=("$2")
+                shift 2
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                log_error "Unknown argument: $1"
+                usage
+                exit 1
+                ;;
+        esac
+    done
+}
 
 build_search_directories() {
     local -a available_dirs=()
@@ -40,8 +79,26 @@ build_search_directories() {
         fi
     done
 
+    if [ ${#IP_PATHS[@]} -gt 0 ]; then
+        for ip_path in "${IP_PATHS[@]}"; do
+            if [ ! -d "$ip_path" ]; then
+                log_warning "IP path '$ip_path' not found. Skipping."
+                continue
+            fi
+
+            for root in "${SEARCH_ROOTS[@]}"; do
+                local candidate="$ip_path/$root"
+                if [ -d "$candidate" ]; then
+                    available_dirs+=("$candidate")
+                else
+                    log_warning "Directory '$candidate' not found. Skipping."
+                fi
+            done
+        done
+    fi
+
     if [ ${#available_dirs[@]} -eq 0 ]; then
-        log_error "No searchable directories (themes/modules) were found in $(pwd)."
+        log_error "No searchable directories (themes/modules) were found in $(pwd) or provided IP paths."
         exit 1
     fi
 
@@ -66,6 +123,8 @@ search_for_pattern() {
 }
 
 main() {
+    parse_args "$@"
+
     mapfile -t dirs < <(build_search_directories)
 
     local found_any=0
