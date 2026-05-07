@@ -21,11 +21,13 @@ wget -qO- https://raw.githubusercontent.com/Arkonsoft/ps-scripts/main/install.sh
 - System Unix/Linux (Linux, macOS, WSL)
 - Shell: bash, zsh, lub sh
 - cURL lub wget (do instalacji)
+- Composer (do `ps:module-create`)
 
 ## 🔧 Po instalacji
 
 1. **Restart terminala** lub uruchom: `source ~/.profile`
 2. **Sprawdź instalację**: `ps:module-check`
+
 ## 📦 Dostępne komendy
 
 Po instalacji dostępne są następujące komendy:
@@ -55,11 +57,13 @@ Tworzy nowy moduł PrestaShop z kompletną strukturą katalogów i plików.
 - Generuje podstawowe pliki modułu
 - Tworzy strukturę katalogów zgodną ze standardami PrestaShop
 - Konfiguruje podstawowe ustawienia
+- Pozwala wybrać wersję PrestaShop, aby pobrać odpowiedni szablon modułu.
 
 **Format nazwy:** PascalCase (np. `ArkonExample`)
 
 ```bash
-ps:module-create <nazwa-modułu>
+ps:module-create
+ps:module-create ArkonExample
 ```
 
 ### `ps:docker-create`

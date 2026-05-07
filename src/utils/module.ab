@@ -1,0 +1,59 @@
+import { match_regex, trim } from "std/text"
+
+import {
+    log_error,
+    log_warning,
+} from "./log.ab"
+
+pub fun is_module_pascal_name(name: Text): Bool {
+    return match_regex(trim(name), "^[A-Z][a-zA-Z0-9]*$", false)
+}
+
+pub fun prompt_pascal_module_with_caption(caption: Text): Text {
+    loop {
+        trust $ printf "%s" "{caption}" $
+        let line = ""
+        trust $ read -r {nameof(line)} $
+        const n = trim(line)
+        if n == "" {
+            log_warning("Module name cannot be empty")
+            continue
+        }
+        if is_module_pascal_name(n) {
+            return n
+        }
+        log_warning("Invalid name: use PascalCase — uppercase first letter, then only letters and numbers")
+    }
+}
+
+pub fun prompt_module_name(): Text {
+    return prompt_pascal_module_with_caption("Module name (PascalCase, e.g. MyModule): ")
+}
+
+pub fun resolve_module_name_for_create(args: [Text]): Text {
+    if len(args) < 2 {
+        return prompt_module_name()
+    }
+    const name = trim(args[1])
+    if name == "" {
+        return prompt_module_name()
+    }
+    if is_module_pascal_name(name) {
+        return name
+    }
+    log_error("Invalid module name: use PascalCase (e.g. MyModule)")
+    exit(1)
+}
+
+pub fun require_module_pascal_name(name: Text, empty_message: Text): Text {
+    const n = trim(name)
+    if n == "" {
+        log_error(empty_message)
+        exit(1)
+    }
+    if is_module_pascal_name(n) {
+        return n
+    }
+    log_error("Invalid module name: use PascalCase (e.g. MyModule)")
+    exit(1)
+}

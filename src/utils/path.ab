@@ -1,0 +1,5 @@
+import { trim } from "std/text"
+
+pub fun cwd(): Text {
+    return trim(trust $ pwd $)
+}

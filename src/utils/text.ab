@@ -1,0 +1,8 @@
+import { lowercase, trim } from "std/text"
+
+pub fun pascal_to_camel(pascal: Text): Text {
+    const p = trim(pascal)
+    const first = trim(trust $ printf "%s" "{p}" | cut -c1 $)
+    const rest = trim(trust $ printf "%s" "{p}" | cut -c2- $)
+    return "{lowercase(first)}{rest}"
+}
