@@ -22,17 +22,37 @@ import { resolve_module_name_for_create } from "./utils/module.ab"
 const EXAMPLE_LOWER = "arkonexample"
 const EXAMPLE_PASCAL = "ArkonExample"
 const GITHUB_REPO = "https://github.com/Arkonsoft/PS-Example-Module.git"
-const GITHUB_BRANCH = "ps8"
 const REPO_MODULE_SUBPATH = "prestashop/modules/arkonexample"
 
 const TEMPLATE_FILES_TO_REMOVE = ["README.md"]
 const TEMPLATE_DIRS_TO_REMOVE = [".github"]
 
-fun show_module_configuration(module_lower: Text, module_pascal: Text) {
-    log_info("Module configuration:")
-    log_warning("- Module name (lower): {module_lower}")
-    log_warning("- Module name (pascal): {module_pascal}")
-    log_warning("- Target folder: {cwd()}")
+fun sayln(msg: Text) {
+    trust $ printf "%s\n" "{msg}" $
+}
+
+fun prompt_github_branch_for_prestashop(): Text {
+    loop {
+        trust $ printf "%s" "Select PrestaShop version (8 or 1.7): " $
+        let line = ""
+        trust $ read -r {nameof(line)} $
+        const c = trim(line)
+        if c == "8" {
+            return "ps8"
+        }
+        if c == "1.7" {
+            return "ps17"
+        }
+        sayln("Enter 8 for PS 8+, or 1.7 for PS 1.7+")
+    }
+}
+
+fun show_module_configuration(module_lower: Text, module_pascal: Text, github_branch: Text) {
+    sayln("Module configuration:")
+    sayln("- Module name (lower): {module_lower}")
+    sayln("- Module name (pascal): {module_pascal}")
+    sayln("- Template branch: {github_branch}")
+    sayln("- Target folder: {cwd()}")
 }
 
 fun get_target_path(module_lower: Text): Text {
@@ -55,11 +75,11 @@ fun refuse_if_target_module_path_busy(target_path: Text) {
     }
 }
 
-fun initialize_module_repository(target_path: Text) {
+fun initialize_module_repository(target_path: Text, github_branch: Text) {
     log_info("Cloning module from repository...")
     const tmp_root = trim(trust $ mktemp -d $)
     const clone_dest = "{tmp_root}/repo"
-    $ git clone --branch "{GITHUB_BRANCH}" --single-branch "{GITHUB_REPO}" "{clone_dest}" $ failed {
+    $ git clone --branch "{github_branch}" --single-branch "{GITHUB_REPO}" "{clone_dest}" $ failed {
         log_error("Error while cloning module")
         silent trust $ rm -rf "{tmp_root}" $
         exit(1)
@@ -178,11 +198,12 @@ main(args) {
 
     const module_lower = trim(lowercase(module_name))
     const module_pascal = trim(module_name)
+    const github_branch = prompt_github_branch_for_prestashop()
 
-    show_module_configuration(module_lower, module_pascal)
+    show_module_configuration(module_lower, module_pascal, github_branch)
     const target_path = get_target_path(module_lower)
     refuse_if_target_module_path_busy(target_path)
-    initialize_module_repository(target_path)?
+    initialize_module_repository(target_path, github_branch)?
 
     log_warning("Replacing lowercase names...")
     replace_text_in_files(EXAMPLE_LOWER, module_lower)?
