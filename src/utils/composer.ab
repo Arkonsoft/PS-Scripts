@@ -1,0 +1,12 @@
+import {
+    log_error,
+    log_warning,
+} from "./log.ab"
+
+pub fun check_composer() {
+    silent $ command -v composer $ failed {
+        log_error("ERROR: Composer is not installed or not available in PATH")
+        log_warning("Please install Composer before running this script: https://getcomposer.org/")
+        exit(1)
+    }
+}

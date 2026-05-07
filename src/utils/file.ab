@@ -1,0 +1,77 @@
+import { split_lines, trim } from "std/text"
+
+import { log_success, log_warning } from "./log.ab"
+
+pub fun replace_text_in_file(fp: Text, search_text: Text, replace_text_arg: Text) {
+    $ grep -q -F "{search_text}" "{fp}" $ exited(code) {
+        if code == 0 {
+            $ sed -i "s/{search_text}/{replace_text_arg}/g" "{fp}" $?
+            log_success("  Changes made to file")
+        } else {
+            echo("  No changes needed")
+        }
+    }
+}
+
+pub fun replace_text_in_files(search_text: Text, replace_text_arg: Text) {
+    const raw = trust $ find . -type f -not -path "*/.*" -not -path "*/vendor/*" $
+    for path_line in split_lines(trim(raw)) {
+        const fp = trim(path_line)
+        if fp == "":
+            continue
+
+        trust $ test -s "{fp}" $ failed {
+            continue
+        }
+
+        const bn = trust $ basename "{fp}" $
+        log_warning("Processing file: {trim(bn)}")
+        replace_text_in_file(fp, search_text, replace_text_arg)?
+    }
+}
+
+pub fun renamed_file_basename(
+    fn: Text,
+    old_pascal: Text,
+    new_pascal: Text,
+    old_camel: Text,
+    new_camel: Text,
+    old_lower: Text,
+    new_lower: Text,
+): Text {
+    return trim(
+        trust $ printf "%s" "{fn}" | sed -e "s/{old_pascal}/{new_pascal}/g" -e "s/{old_camel}/{new_camel}/g" -e "s/{old_lower}/{new_lower}/g" $,
+    )
+}
+
+pub fun move_file(src: Text, dest: Text) {
+    $ mv -- "{src}" "{dest}" $?
+}
+
+pub fun remove_file_if_exists(path: Text) {
+    const p = trim(path)
+    if p != "" {
+        trust $ test -f "{p}" $ exited(code) {
+            if code == 0 {
+                $ rm -f "{p}" $?
+                log_success("Removed file: {p}")
+            } else {
+                log_warning("File not found (skip): {p}")
+            }
+        }
+    }
+}
+
+pub fun remove_dir_if_exists(path: Text) {
+    const p = trim(path)
+    if p != "" {
+        trust $ test -d "{p}" $ exited(code) {
+            if code == 0 {
+                $ rm -rf "{p}" $?
+                log_success("Removed directory: {p}")
+            } else {
+                log_warning("Directory not found (skip): {p}")
+            }
+        }
+    }
+}

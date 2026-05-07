@@ -1,0 +1,201 @@
+import {
+    lowercase,
+    split_lines,
+    trim,
+} from "std/text"
+
+import {
+    log_info,
+    log_success,
+    log_warning,
+    log_error,
+} from "./utils/log.ab"
+
+import { cwd } from "./utils/path.ab"
+
+import { check_composer } from "./utils/composer.ab"
+
+import { move_file, remove_dir_if_exists, remove_file_if_exists, replace_text_in_files } from "./utils/file.ab"
+
+import { resolve_module_name_for_create } from "./utils/module.ab"
+
+const EXAMPLE_LOWER = "arkonexample"
+const EXAMPLE_PASCAL = "ArkonExample"
+const GITHUB_REPO = "https://github.com/Arkonsoft/PS-Example-Module.git"
+const GITHUB_BRANCH = "ps8"
+const REPO_MODULE_SUBPATH = "prestashop/modules/arkonexample"
+
+const TEMPLATE_FILES_TO_REMOVE = ["README.md"]
+const TEMPLATE_DIRS_TO_REMOVE = [".github"]
+
+fun show_module_configuration(module_lower: Text, module_pascal: Text) {
+    log_info("Module configuration:")
+    log_warning("- Module name (lower): {module_lower}")
+    log_warning("- Module name (pascal): {module_pascal}")
+    log_warning("- Target folder: {cwd()}")
+}
+
+fun get_target_path(module_lower: Text): Text {
+    const current_folder = trust $ basename "{cwd()}" $
+    const current_trim = trim(current_folder)
+    if current_trim == module_lower:
+        return cwd()
+
+    return "{cwd()}/{module_lower}"
+}
+
+fun refuse_if_target_module_path_busy(target_path: Text) {
+    if trim(target_path) != trim(cwd()) {
+        trust $ test -e "{target_path}" $ exited(code) {
+            if code == 0 {
+                log_error("Path already exists (choose another name or remove it): {target_path}")
+                exit(1)
+            }
+        }
+    }
+}
+
+fun initialize_module_repository(target_path: Text) {
+    log_info("Cloning module from repository...")
+    const tmp_root = trim(trust $ mktemp -d $)
+    const clone_dest = "{tmp_root}/repo"
+    $ git clone --branch "{GITHUB_BRANCH}" --single-branch "{GITHUB_REPO}" "{clone_dest}" $ failed {
+        log_error("Error while cloning module")
+        silent trust $ rm -rf "{tmp_root}" $
+        exit(1)
+    }
+
+    const module_src = "{clone_dest}/{REPO_MODULE_SUBPATH}"
+    trust $ test -d "{module_src}" $ failed {
+        log_error("Module template path not found in repository: {REPO_MODULE_SUBPATH}")
+        silent trust $ rm -rf "{tmp_root}" $
+        exit(1)
+    }
+
+    const workdir = cwd()
+    if trim(target_path) == trim(workdir) {
+        $ cp -a "{module_src}/." "{target_path}/" $ failed {
+            log_error("Error copying module template")
+            silent trust $ rm -rf "{tmp_root}" $
+            exit(1)
+        }
+    } else {
+        $ mv "{module_src}" "{target_path}" $ failed {
+            log_error("Error moving module to target folder")
+            silent trust $ rm -rf "{tmp_root}" $
+            exit(1)
+        }
+    }
+
+    silent trust $ rm -rf "{tmp_root}" $
+
+    $ cd "{target_path}" $?
+    silent trust $ rm -rf .git $
+    log_success("Module cloned successfully")
+}
+
+fun renamed_module_basename(
+    fn: Text,
+    module_lower: Text,
+    module_pascal: Text,
+    template_lower: Text,
+    template_pascal: Text,
+): Text {
+    return trim(trust $ printf "%s" "{fn}" | sed -e "s/{template_lower}/{module_lower}/g" -e "s/{template_pascal}/{module_pascal}/g" $)
+}
+
+fun rename_module_files(module_lower: Text, module_pascal: Text) {
+    log_info("Renaming files...")
+    const raw = trust $ find . -type f -not -path "*/.*" -not -path "*/vendor/*" $
+    for path_line in split_lines(trim(raw)) {
+        const fp = trim(path_line)
+        if fp == "":
+            continue
+
+        const filename = trust $ basename "{fp}" $
+        const directory = trust $ dirname "{fp}" $
+        const fn = trim(filename)
+        const newname = renamed_module_basename(fn, module_lower, module_pascal, EXAMPLE_LOWER, EXAMPLE_PASCAL)
+
+        if newname != fn {
+            log_warning("Renaming: {fn} -> {newname}")
+            const dest_path = "{trim(directory)}/{newname}"
+            move_file(fp, dest_path)?
+        }
+    }
+}
+
+fun install_module_dependencies() {
+    log_info("Running composer install...")
+    $ composer install $ failed {
+        log_error("Error running composer install")
+        exit(1)
+    }
+    log_success("Composer install completed successfully")
+}
+
+fun confirm_module_location() {
+    const current_folder = trim(trust $ basename "{cwd()}" $)
+    if current_folder != "modules" {
+        log_error("You are not in a 'modules' folder!")
+        log_warning("Creating modules outside of a 'modules' directory is not recommended.")
+
+        trust $ printf "%s" "Do you want to continue anyway? (y/N) " $
+        let confirmation = ""
+        trust $ read -r {nameof(confirmation)} $
+
+        if {
+            confirmation == "y" {
+                trust $ true $
+            }
+            confirmation == "Y" {
+                trust $ true $
+            }
+            else {
+                log_info("Operation cancelled by user")
+                exit(0)
+            }
+        }
+    }
+}
+
+fun remove_template_artifacts() {
+    log_info("Removing template files and directories...")
+    for path in TEMPLATE_FILES_TO_REMOVE {
+        remove_file_if_exists(trim(path))?
+    }
+    for path in TEMPLATE_DIRS_TO_REMOVE {
+        remove_dir_if_exists(trim(path))?
+    }
+}
+
+main(args) {
+    silent trust $ test -n "{args[0]}" $
+    check_composer()
+    const module_name = resolve_module_name_for_create(args)
+    const original_location = cwd()
+    confirm_module_location()
+
+    const module_lower = trim(lowercase(module_name))
+    const module_pascal = trim(module_name)
+
+    show_module_configuration(module_lower, module_pascal)
+    const target_path = get_target_path(module_lower)
+    refuse_if_target_module_path_busy(target_path)
+    initialize_module_repository(target_path)?
+
+    log_warning("Replacing lowercase names...")
+    replace_text_in_files(EXAMPLE_LOWER, module_lower)?
+
+    log_warning("Replacing PascalCase names...")
+    replace_text_in_files(EXAMPLE_PASCAL, module_pascal)?
+
+    rename_module_files(module_lower, module_pascal)?
+    remove_template_artifacts()?
+    install_module_dependencies()
+
+    $ cd "{original_location}" $?
+
+    log_info("Module configuration completed successfully")
+    log_warning("Module location: {target_path}")
+}

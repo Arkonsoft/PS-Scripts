@@ -1,0 +1,148 @@
+import {
+    lowercase,
+    split_lines,
+    trim,
+} from "std/text"
+
+import {
+    log_error,
+    log_info,
+    log_success,
+    log_warning,
+} from "./utils/log.ab"
+
+import { move_file, renamed_file_basename, replace_text_in_files } from "./utils/file.ab"
+
+import { pascal_to_camel } from "./utils/text.ab"
+
+import {
+    prompt_pascal_module_with_caption,
+    require_module_pascal_name,
+} from "./utils/module.ab"
+
+fun resolve_old_pascal(args: [Text]): Text {
+    if len(args) >= 3 {
+        return require_module_pascal_name(
+            trim(args[1]),
+            "Current module name cannot be empty.",
+        )
+    }
+    return prompt_pascal_module_with_caption(
+        "Current module name (PascalCase, e.g. MyModule): ",
+    )
+}
+
+fun resolve_new_pascal(args: [Text]): Text {
+    if len(args) >= 3 {
+        return require_module_pascal_name(
+            trim(args[2]),
+            "New module name cannot be empty.",
+        )
+    }
+    return prompt_pascal_module_with_caption(
+        "New module name (PascalCase, e.g. MyModule): ",
+    )
+}
+
+fun rename_module_files_for_rename(
+    old_pascal: Text,
+    new_pascal: Text,
+    old_camel: Text,
+    new_camel: Text,
+    old_lower: Text,
+    new_lower: Text,
+) {
+    log_info("Renaming files...")
+    const raw = trust $ find . -type f -not -path "*/.*" -not -path "*/vendor/*" $
+    for path_line in split_lines(trim(raw)) {
+        const fp = trim(path_line)
+        if fp == "":
+            continue
+
+        const filename = trust $ basename "{fp}" $
+        const directory = trust $ dirname "{fp}" $
+        const fn = trim(filename)
+        const newname = renamed_file_basename(
+            fn,
+            old_pascal,
+            new_pascal,
+            old_camel,
+            new_camel,
+            old_lower,
+            new_lower,
+        )
+
+        if newname != fn {
+            log_warning("Renaming: {fn} -> {newname}")
+            const dest_path = "{trim(directory)}/{newname}"
+            move_file(fp, dest_path)?
+        }
+    }
+}
+
+main(args) {
+    silent trust $ test -n "{args[0]}" $
+
+    const modules_dir = trim(trust $ pwd $)
+    const old_pascal = resolve_old_pascal(args)
+    const new_pascal = resolve_new_pascal(args)
+
+    if trim(old_pascal) == trim(new_pascal) {
+        log_error("Old and new module names are the same.")
+        exit(1)
+    }
+
+    const old_lower = trim(lowercase(old_pascal))
+    const new_lower = trim(lowercase(new_pascal))
+    const old_camel = pascal_to_camel(old_pascal)
+    const new_camel = pascal_to_camel(new_pascal)
+
+    const module_root = "{modules_dir}/{old_lower}"
+    trust $ test -d "{module_root}" $ failed {
+        log_error("Module directory not found: {module_root}")
+        log_warning("Run this from the PrestaShop `modules` folder (current: {modules_dir}).")
+        exit(1)
+    }
+
+    const target_path = "{modules_dir}/{new_lower}"
+    trust $ test -e "{target_path}" $ exited(exists_code) {
+        if exists_code == 0 {
+            log_error("Target path already exists: {target_path}")
+            exit(1)
+        }
+    }
+
+    log_info("Renaming module:")
+    log_warning("- From: {old_pascal} ({old_lower})")
+    log_warning("- To:   {new_pascal} ({new_lower})")
+    log_warning("- Root: {module_root}")
+
+    $ cd "{module_root}" $?
+
+    log_info("Replacing PascalCase in file contents...")
+    replace_text_in_files(old_pascal, new_pascal)?
+
+    log_info("Replacing camelCase in file contents...")
+    replace_text_in_files(old_camel, new_camel)?
+
+    log_info("Replacing lowercase in file contents...")
+    replace_text_in_files(old_lower, new_lower)?
+
+    rename_module_files_for_rename(
+        old_pascal,
+        new_pascal,
+        old_camel,
+        new_camel,
+        old_lower,
+        new_lower,
+    )?
+
+    $ cd "{modules_dir}" $?
+    $ mv -- "{old_lower}" "{new_lower}" $ failed {
+        log_error("Failed to rename module directory")
+        exit(1)
+    }
+
+    const new_root = "{modules_dir}/{new_lower}"
+    log_success("Module renamed to {new_root}")
+}
