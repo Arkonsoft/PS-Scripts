@@ -19,14 +19,20 @@ wget -qO- https://raw.githubusercontent.com/Arkonsoft/ps-scripts/main/install.sh
 ## 📋 Wymagania
 
 - System Unix/Linux (Linux, macOS, WSL)
-- Shell: bash, zsh, lub sh
+- Shell: bash, zsh, sh lub fish
 - cURL lub wget (do instalacji)
 - Composer (do `ps:module-create`)
 
 ## 🔧 Po instalacji
 
 1. **Restart terminala** lub uruchom: `source ~/.profile`
+   - w fish: `source ~/.config/fish/config.fish`
 2. **Sprawdź instalację**: `ps:module-check`
+
+> Instalator wykrywa fish (po powłoce, z której został uruchomiony, oraz po `$SHELL`)
+> i dopisuje konfigurację do `~/.config/fish/config.fish`, ładując `loader.fish`
+> zamiast `loader.sh`. Gdy fish jest powłoką logowania, profil POSIX (`.bashrc`/`.zshrc`)
+> nie jest modyfikowany.
 
 ## 📦 Dostępne komendy
 
